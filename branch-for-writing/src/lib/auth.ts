@@ -1,25 +1,19 @@
-import { AuthOptions } from "next-auth";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { betterAuth } from "better-auth";
 import { db } from "./db";
-import EmailProvider from "next-auth/providers/resend";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import * as schema from "../../database/schema";
 
-export const authOptions: AuthOptions = {
-  adapter: DrizzleAdapter(db),
-  session: { strategy: "jwt" },
-  providers: [
-    EmailProvider({
-      // Resend example
-      from: "login@your-domain.com",
-    }),
-  ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) token.id = user.id;
-      return token;
-    },
-    session({ session, token }) {
-      session.user.id = token.id as string;
-      return session;
-    },
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: schema,
+  }),
+  emailAndPassword: {
+    enabled: true,
+    // You can add more email/password options here if needed
   },
-};
+  // Add other providers or plugins here as you expand
+  // e.g., social logins, 2FA, etc.
+});
+
+export type { Session, User } from "better-auth";
