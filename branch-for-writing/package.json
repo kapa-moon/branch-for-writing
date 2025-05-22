@@ -12,6 +12,7 @@
     "@auth/drizzle-adapter": "^1.9.1",
     "@daveyplate/better-auth-ui": "^1.7.1",
     "@neondatabase/serverless": "^1.0.0",
+    "@tiptap/extension-placeholder": "^2.12.0",
     "@tiptap/pm": "^2.12.0",
     "@tiptap/react": "^2.12.0",
     "@tiptap/starter-kit": "^2.12.0",
