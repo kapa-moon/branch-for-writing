@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Link={Link} // Pass the Next.js Link component
             // You can add other props here to customize behavior e.g.
             // socialProviders={['github', 'google']}
-            // forgotPassword={true}
+            forgotPassword={false}
             // signUpFields={['name']} // If you want to include a name field in sign-up
           >
             <header style={{ display: 'flex', alignItems: 'center', height: '5vh', padding: '0.2rem 20px', borderBottom: '1px solid #eee', flexShrink: 0, boxSizing: 'border-box' }}>
