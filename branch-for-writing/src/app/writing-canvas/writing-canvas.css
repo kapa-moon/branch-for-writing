@@ -109,14 +109,16 @@ body {
 .editor-wrapper {
     display: flex;
     flex-direction: row;
+    height: 20%;
     flex-grow: 1; /* Allow wrapper to take remaining vertical space */
     overflow: hidden; /* Prevent content overflow from affecting page layout */
 }
 
 .tiptap-editor-container {
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 0px;
     padding: 10px;
+    height: 70vh;
     background-color: #fff; /* Ensure background for editors */
     display: flex; /* Use flex to manage internal layout, e.g., close button */
     flex-direction: column; /* Stack editor and close button */
