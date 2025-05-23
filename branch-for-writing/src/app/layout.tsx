@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             // forgotPassword={true}
             // signUpFields={['name']} // If you want to include a name field in sign-up
           >
-            <header style={{ height: '5vh', padding: '0.2rem', borderBottom: '1px solid #eee', flexShrink: 0, boxSizing: 'border-box' }}>
+            <header style={{ display: 'flex', alignItems: 'center', height: '5vh', padding: '0.2rem 20px', borderBottom: '1px solid #eee', flexShrink: 0, boxSizing: 'border-box' }}>
               <AuthStatus />
             </header>
             <main style={{ height: '95vh', overflowY: 'hidden', boxSizing: 'border-box' }}> {/* Main takes 95% height, content must fit or will be hidden */}

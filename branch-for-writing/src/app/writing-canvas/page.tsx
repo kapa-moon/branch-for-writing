@@ -114,7 +114,7 @@ export default function WritingCanvasPage() {
           {isSideMenuOpen ? 'Close Versions' : 'Compare Versions'}
         </button>
       </div>
-      <p>Welcome, {currentUser.name || currentUser.email}!</p>
+      {/* <p>Welcome, {currentUser.name || currentUser.email}!</p> */}
 
       {isSideMenuOpen && (
         <div className="versions-side-menu">

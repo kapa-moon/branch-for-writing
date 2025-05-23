@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
+import './auth-status.css'; // Import the CSS file
 
 export default function AuthStatus() {
   const { data: sessionData, isPending, error } = authClient.useSession();
@@ -18,27 +19,20 @@ export default function AuthStatus() {
   };
 
   if (isPending) {
-    return <p>Loading session...</p>;
+    return <div className="loading-text"><p>Loading session...</p></div>;
   }
 
   if (error) {
-    return <p>Error loading session: {error.message}</p>;
+    return <div className="error-text"><p>Error loading session: {error.message}</p></div>;
   }
 
   if (user && session) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <p>Signed in as {user.email || user.name || 'User'}</p>
+      <div className="auth-status-container">
+        <p className="auth-status-text">Signed in as {user.name || 'User'}</p>
         <button 
           onClick={handleSignOut}
-          style={{
-            padding: '8px 12px',
-            backgroundColor: '#dc3545',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
+          className="sign-out-button"
         >
           Sign Out
         </button>
@@ -47,31 +41,17 @@ export default function AuthStatus() {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-      <p>You are not signed in.</p>
+    <div className="auth-status-container">
+      <p className="auth-status-text">You are not signed in.</p>
       <button 
         onClick={() => router.push('/signin')}
-        style={{
-          padding: '8px 12px',
-          backgroundColor: '#0070f3',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
+        className="sign-in-button"
       >
         Sign In
       </button>
       <button 
         onClick={() => router.push('/signup')}
-        style={{
-          padding: '8px 12px',
-          backgroundColor: '#28a745',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
+        className="sign-up-button"
       >
         Sign Up
       </button>

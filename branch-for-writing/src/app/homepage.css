@@ -1,0 +1,46 @@
+.homepage-container {
+  font-family: 'Atkinson Hyperlegible', sans-serif;
+  text-align: center; /* From existing inline styles */
+  padding: 50px; /* From existing inline styles */
+}
+
+/* You can add more specific styles here if needed for elements within the homepage */
+.homepage-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  /* Add other common button styles here if you want to standardize them */
+}
+
+.signup-button-homepage {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+
+.link-button-homepage {
+  font-size: 2em;
+  padding: 10px 20px;
+  color: black;
+  text-decoration: none;
+  border-radius: 5px;
+  border: none;
+  display: inline-block;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.link-button-homepage:hover {
+  color: #781ed1;
+}
+
+.link-text-go-to {
+  font-family: 'Atkinson Hyperlegible', sans-serif;
+  font-size: 0.7em;
+}
+
+.link-text-writing-canvas {
+  font-family: 'Londrina Sketch', cursive;
+  font-size: 1.2em;
+}

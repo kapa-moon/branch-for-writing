@@ -17,13 +17,13 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 20px; /* Match main padding */
-    margin-bottom: 10px;
+    padding: 0 0px; /* Match main padding */
+    margin-bottom: 5vh;
 }
 
 .writing-canvas-title {
     font-family: 'Londrina Sketch', cursive;
-    font-size: 2rem; /* Reduced for better fit */
+    font-size: 2.7rem; /* Reduced for better fit */
     font-weight: bold;
     text-align: left;
     margin: 0; /* Remove default margin */
@@ -118,7 +118,7 @@ body {
     border: 1px solid #ccc;
     border-radius: 0px;
     padding: 10px;
-    height: 70vh;
+    height: 73vh;
     background-color: #fff; /* Ensure background for editors */
     display: flex; /* Use flex to manage internal layout, e.g., close button */
     flex-direction: column; /* Stack editor and close button */

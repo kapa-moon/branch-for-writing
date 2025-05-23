@@ -1,0 +1,60 @@
+.auth-status-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  margin-right: 0px; /* Pushes to right and adds some margin */
+  
+}
+
+/* .auth-status-text {
+  /* Style for "Signed in as..." or "You are not signed in." if needed */
+  /* For now, inherits from parent or global styles */
+/* }  */
+
+.sign-out-button {
+  padding: 8px 12px;
+  background-color: #f0f0f0;
+  color: black;
+  border: 1px solid black;
+  border-radius: 0px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sign-out-button:hover {
+  background-color: white; /* Slightly gray on hover */
+}
+
+.sign-in-button {
+  padding: 8px 12px;
+  background-color: white;
+  color: rgb(0, 0, 0);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sign-in-button:hover {
+  background-color: #f0f0f0; /* Darker blue on hover, example */
+}
+
+.sign-up-button {
+  padding: 8px 12px;
+  background-color: white;
+  color: rgb(0, 0, 0);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sign-up-button:hover {
+  background-color: #f0f0f0; /* Darker green on hover, example */
+}
+
+.loading-text p, .error-text p {
+  margin-left: auto;
+  margin-right: 20px;
+}
