@@ -1,7 +1,7 @@
 export interface TiptapMark {
   type: string;
-  attrs?: Record<string, any>; // Tiptap's internal type uses 'any' here
-  [key: string]: any; // To match Tiptap's expectation of { [key: string]: any; ... }
+  attrs?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface TiptapNode {
