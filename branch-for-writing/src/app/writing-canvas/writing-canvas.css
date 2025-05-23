@@ -121,6 +121,7 @@ body {
     display: flex; /* Use flex to manage internal layout, e.g., close button */
     flex-direction: column; /* Stack editor and close button */
     overflow-y: auto; /* Allow individual editor scrolling */
+    scrollbar-width: none;
 }
 
 .tiptap-editor-container .ProseMirror {
