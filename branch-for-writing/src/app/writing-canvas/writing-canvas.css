@@ -126,6 +126,7 @@ body {
 .tiptap-editor-container .ProseMirror {
     flex-grow: 1; /* Make editor take available space within container */
     min-height: 200px; /* Ensure a minimum height */
+    overflow-y: hidden; /* Prevent internal scrollbar, let container scroll */
 }
 
 /* Single editor mode (main editor takes ~65%) */

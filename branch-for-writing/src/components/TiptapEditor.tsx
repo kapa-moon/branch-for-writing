@@ -4,10 +4,11 @@ import React from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import { TiptapDocument } from '@/types/tiptap';
 
 interface TiptapEditorProps {
-  initialContent: any;
-  onContentChange: (content: any) => void;
+  initialContent: TiptapDocument | null;
+  onContentChange: (content: TiptapDocument) => void;
   isEditable?: boolean;
 }
 
@@ -23,7 +24,7 @@ const TiptapEditor = ({ initialContent, onContentChange, isEditable = true }: Ti
     editable: isEditable,
     onUpdate: ({ editor: currentEditor }) => {
       if (isEditable) {
-        onContentChange(currentEditor.getJSON());
+        onContentChange(currentEditor.getJSON() as TiptapDocument);
       }
     },
     editorProps: {

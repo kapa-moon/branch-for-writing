@@ -5,11 +5,12 @@ import { authClient } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import TiptapEditor from '@/components/TiptapEditor';
 import './writing-canvas.css';
+import { TiptapDocument } from '@/types/tiptap';
 
 const LOCAL_STORAGE_KEY = 'tiptap-main-document';
 
 // Initial content if nothing is in local storage for the main editor
-const defaultInitialMainDocContent = {
+const defaultInitialMainDocContent: TiptapDocument = {
   type: 'doc',
   content: [
     {
@@ -19,8 +20,15 @@ const defaultInitialMainDocContent = {
   ],
 };
 
-// Mock versions data
-const mockVersions = [
+// Mock versions data - update content to use TiptapDocument
+interface Version {
+  id: string;
+  name: string;
+  timestamp: string;
+  content: TiptapDocument;
+}
+
+const mockVersions: Version[] = [
   { id: 'v1', name: 'Version 1 (Draft)', timestamp: '2023-10-26 10:00', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'This is the first saved version content.' }] }] } },
   { id: 'v2', name: 'Version 2 (Revised)', timestamp: '2023-10-26 14:30', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'This is a revised version with much more detail and examples.' }] }] } },
   { id: 'v3', name: 'Version 3 (Final Touches)', timestamp: '2023-10-27 09:15', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Final touches have been added to this version for review.' }] }] } },
@@ -31,24 +39,23 @@ export default function WritingCanvasPage() {
   const router = useRouter();
   
   const currentUser = sessionData?.user ? {
-    // @ts-ignore
     id: sessionData.user.id || 'current-user-temp-id',
-    // @ts-ignore
     name: sessionData.user.name,
     email: sessionData.user.email
   } : null;
   
-  const [mainDocumentContent, setMainDocumentContent] = useState<any>(defaultInitialMainDocContent);
-  const [selectedReviewVersion, setSelectedReviewVersion] = useState<any>(null);
+  const [mainDocumentContent, setMainDocumentContent] = useState<TiptapDocument>(defaultInitialMainDocContent);
+  const [selectedReviewVersion, setSelectedReviewVersion] = useState<Version | null>(null);
   const [isReviewing, setIsReviewing] = useState<boolean>(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
 
   // Load main document from local storage on mount
   useEffect(() => {
-    const savedContent = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedContent) {
+    const savedContentString = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedContentString) {
       try {
-        setMainDocumentContent(JSON.parse(savedContent));
+        const savedContent: TiptapDocument = JSON.parse(savedContentString);
+        setMainDocumentContent(savedContent);
       } catch (e) {
         console.error("Failed to parse content from local storage", e);
         setMainDocumentContent(defaultInitialMainDocContent);
@@ -64,12 +71,12 @@ export default function WritingCanvasPage() {
     }
   }, [isPending, sessionData, router]);
 
-  const handleMainContentChange = (newContent: any) => {
+  const handleMainContentChange = (newContent: TiptapDocument) => {
     setMainDocumentContent(newContent);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newContent));
   };
 
-  const handleOpenVersionForReview = (version: any) => {
+  const handleOpenVersionForReview = (version: Version) => {
     setSelectedReviewVersion(version);
     setIsReviewing(true);
     setIsSideMenuOpen(false);
