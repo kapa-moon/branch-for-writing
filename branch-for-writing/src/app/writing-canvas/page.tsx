@@ -113,7 +113,7 @@ export default function WritingCanvasPage() {
       <div className="canvas-header">
         <h1 className='writing-canvas-title'>Writing Canvas</h1>
         <button onClick={() => setAIToolOpen(!isAIToolOpen)} className="versions-button">
-          {isAIToolOpen ? 'AI Toolbox' : 'Close AI Toolbox'}
+          {isAIToolOpen ? 'Close AI Toolbox' : 'AI Toolbox'}
         </button>
         <button onClick={() => setIsSideMenuOpen(!isSideMenuOpen)} className="versions-button">
           {isSideMenuOpen ? 'Close Versions' : 'Compare Versions'}
@@ -137,7 +137,7 @@ export default function WritingCanvasPage() {
       )}
 
       <div className={`editor-wrapper ${isReviewing ? 'review-mode' : 'single-mode'}`}>
-        <div className={`main-editor-container ${isAIToolOpen ? 'tiptap-editor-container':'tiptap-editor-container-tool-open'}`}>
+        <div className={`main-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
           <TiptapEditor 
             initialContent={mainContentForEditor}
             onContentChange={handleMainContentChange}
@@ -145,7 +145,7 @@ export default function WritingCanvasPage() {
           />
         </div>
         {isReviewing && selectedReviewVersion && (
-          <div className={`review-editor-container ${isAIToolOpen ? 'tiptap-editor-container':'tiptap-editor-container-tool-open'}`}>
+          <div className={`review-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
             <button onClick={handleCloseReview} className="close-review-button">Close Review</button>
             <TiptapEditor 
               key={selectedReviewVersion.id}
@@ -156,7 +156,7 @@ export default function WritingCanvasPage() {
           </div>
         )}
       </div>
-      {!isAIToolOpen && <AITool/> }
+      {isAIToolOpen && <AITool/> }
       
     </main>
   );
