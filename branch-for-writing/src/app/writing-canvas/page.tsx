@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import TiptapEditor from '@/components/TiptapEditor';
 import './writing-canvas.css';
 import { TiptapDocument } from '@/types/tiptap';
-import { is } from 'drizzle-orm';
 import AITool from '@/components/AITool';
 
 const LOCAL_STORAGE_KEY = 'tiptap-main-document';
