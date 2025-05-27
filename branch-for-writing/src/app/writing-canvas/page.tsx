@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import TiptapEditor from '@/components/TiptapEditor';
 import './writing-canvas.css';
 import { TiptapDocument } from '@/types/tiptap';
+import { is } from 'drizzle-orm';
+import AITool from '@/components/AITool';
 
 const LOCAL_STORAGE_KEY = 'tiptap-main-document';
 
@@ -48,6 +50,7 @@ export default function WritingCanvasPage() {
   const [selectedReviewVersion, setSelectedReviewVersion] = useState<Version | null>(null);
   const [isReviewing, setIsReviewing] = useState<boolean>(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
+  const [isAIToolOpen, setAIToolOpen] = useState<boolean>(false);
 
   // Load main document from local storage on mount
   useEffect(() => {
@@ -110,6 +113,9 @@ export default function WritingCanvasPage() {
     <main style={{ padding: '20px' }} className={`writing-canvas-page ${isReviewing ? 'is-reviewing' : ''} ${isSideMenuOpen ? 'side-menu-open' : ''}`}>
       <div className="canvas-header">
         <h1 className='writing-canvas-title'>Writing Canvas</h1>
+        <button onClick={() => setAIToolOpen(!isAIToolOpen)} className="versions-button">
+          {isAIToolOpen ? 'AI Toolbox' : 'Close AI Toolbox'}
+        </button>
         <button onClick={() => setIsSideMenuOpen(!isSideMenuOpen)} className="versions-button">
           {isSideMenuOpen ? 'Close Versions' : 'Compare Versions'}
         </button>
@@ -132,7 +138,7 @@ export default function WritingCanvasPage() {
       )}
 
       <div className={`editor-wrapper ${isReviewing ? 'review-mode' : 'single-mode'}`}>
-        <div className='tiptap-editor-container main-editor-container'>
+        <div className={`main-editor-container ${isAIToolOpen ? 'tiptap-editor-container':'tiptap-editor-container-tool-open'}`}>
           <TiptapEditor 
             initialContent={mainContentForEditor}
             onContentChange={handleMainContentChange}
@@ -140,7 +146,7 @@ export default function WritingCanvasPage() {
           />
         </div>
         {isReviewing && selectedReviewVersion && (
-          <div className='tiptap-editor-container review-editor-container'>
+          <div className={`review-editor-container ${isAIToolOpen ? 'tiptap-editor-container':'tiptap-editor-container-tool-open'}`}>
             <button onClick={handleCloseReview} className="close-review-button">Close Review</button>
             <TiptapEditor 
               key={selectedReviewVersion.id}
@@ -151,6 +157,8 @@ export default function WritingCanvasPage() {
           </div>
         )}
       </div>
+      {!isAIToolOpen && <AITool/> }
+      
     </main>
   );
 } 
