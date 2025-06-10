@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import TiptapEditor from '@/components/TiptapEditor';
@@ -21,7 +21,7 @@ const defaultInitialMainDocContent: TiptapDocument = {
   ],
 };
 
-// Mock versions data - update content to use TiptapDocument
+// Interface for version data
 interface Version {
   id: string;
   name: string;
@@ -29,27 +29,27 @@ interface Version {
   content: TiptapDocument;
 }
 
-const mockVersions: Version[] = [
-  { id: 'v1', name: 'Version 1 (Draft)', timestamp: '2023-10-26 10:00', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'This is the first saved version content.' }] }] } },
-  { id: 'v2', name: 'Version 2 (Revised)', timestamp: '2023-10-26 14:30', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'This is a revised version with much more detail and examples.' }] }] } },
-  { id: 'v3', name: 'Version 3 (Final Touches)', timestamp: '2023-10-27 09:15', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Final touches have been added to this version for review.' }] }] } },
-];
-
 export default function WritingCanvasPage() {
   const { data: sessionData, isPending, error } = authClient.useSession();
   const router = useRouter();
   
-  const currentUser = sessionData?.user ? {
-    id: sessionData.user.id || 'current-user-temp-id',
-    name: sessionData.user.name,
-    email: sessionData.user.email
-  } : null;
+  // Memoize currentUser to prevent unnecessary re-renders
+  const currentUser = useMemo(() => {
+    return sessionData?.user ? {
+      id: sessionData.user.id || 'current-user-temp-id',
+      name: sessionData.user.name,
+      email: sessionData.user.email
+    } : null;
+  }, [sessionData?.user?.id, sessionData?.user?.name, sessionData?.user?.email]);
   
   const [mainDocumentContent, setMainDocumentContent] = useState<TiptapDocument>(defaultInitialMainDocContent);
   const [selectedReviewVersion, setSelectedReviewVersion] = useState<Version | null>(null);
   const [isReviewing, setIsReviewing] = useState<boolean>(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
   const [isAIToolOpen, setAIToolOpen] = useState<boolean>(false);
+  const [versions, setVersions] = useState<Version[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState<boolean>(false);
+  const [isSavingVersion, setIsSavingVersion] = useState<boolean>(false);
 
   // Load main document from local storage on mount
   useEffect(() => {
@@ -67,11 +67,96 @@ export default function WritingCanvasPage() {
     }
   }, []);
 
+  // Load versions when user is authenticated (only run once when user ID is available)
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchVersions();
+    }
+  }, [currentUser?.id]); // Only depend on user ID to prevent infinite loops
+
   useEffect(() => {
     if (!isPending && !sessionData?.user) {
       router.replace('/signin?message=auth_required');
     }
   }, [isPending, sessionData, router]);
+
+  const fetchVersions = async () => {
+    if (isLoadingVersions) return; // Prevent multiple simultaneous calls
+    
+    setIsLoadingVersions(true);
+    try {
+      const response = await fetch('/api/versions');
+      if (response.ok) {
+        const fetchedVersions = await response.json();
+        setVersions(fetchedVersions);
+      } else {
+        console.error('Failed to fetch versions:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching versions:', error);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
+  const saveVersion = async () => {
+    if (!currentUser || !mainDocumentContent) return;
+
+    const versionName = prompt('Enter a name for this version:');
+    if (!versionName || versionName.trim() === '') return;
+
+    setIsSavingVersion(true);
+    try {
+      const response = await fetch('/api/versions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: versionName.trim(),
+          content: mainDocumentContent,
+        }),
+      });
+
+      if (response.ok) {
+        const newVersion = await response.json();
+        setVersions(prev => [newVersion, ...prev]);
+        alert('Version saved successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to save version: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving version:', error);
+      alert('Error saving version. Please try again.');
+    } finally {
+      setIsSavingVersion(false);
+    }
+  };
+
+  const deleteVersion = async (versionId: string) => {
+    if (!confirm('Are you sure you want to delete this version?')) return;
+
+    try {
+      const response = await fetch(`/api/versions/${versionId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setVersions(prev => prev.filter(v => v.id !== versionId));
+        if (selectedReviewVersion?.id === versionId) {
+          handleCloseReview();
+        }
+        alert('Version deleted successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to delete version: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting version:', error);
+      alert('Error deleting version. Please try again.');
+    }
+  };
 
   const handleMainContentChange = (newContent: TiptapDocument) => {
     setMainDocumentContent(newContent);
@@ -112,12 +197,26 @@ export default function WritingCanvasPage() {
     <main style={{ padding: '20px' }} className={`writing-canvas-page ${isReviewing ? 'is-reviewing' : ''} ${isSideMenuOpen ? 'side-menu-open' : ''}`}>
       <div className="canvas-header">
         <h1 className='writing-canvas-title'>Writing Canvas</h1>
-        <button onClick={() => setAIToolOpen(!isAIToolOpen)} className="versions-button">
-          {isAIToolOpen ? 'Close AI Toolbox' : 'AI Toolbox'}
-        </button>
-        <button onClick={() => setIsSideMenuOpen(!isSideMenuOpen)} className="versions-button">
-          {isSideMenuOpen ? 'Close Versions' : 'Compare Versions'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={saveVersion} 
+            disabled={isSavingVersion}
+            className="versions-button"
+            style={{ 
+              backgroundColor: isSavingVersion ? '#ccc' : '#4CAF50',
+              color: 'white',
+              cursor: isSavingVersion ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isSavingVersion ? 'Saving...' : 'Save Version'}
+          </button>
+          <button onClick={() => setAIToolOpen(!isAIToolOpen)} className="versions-button">
+            {isAIToolOpen ? 'Close AI Toolbox' : 'AI Toolbox'}
+          </button>
+          <button onClick={() => setIsSideMenuOpen(!isSideMenuOpen)} className="versions-button">
+            {isSideMenuOpen ? 'Close Versions' : 'Compare Versions'}
+          </button>
+        </div>
       </div>
       {/* <p>Welcome, {currentUser.name || currentUser.email}!</p> */}
 
@@ -125,18 +224,42 @@ export default function WritingCanvasPage() {
         <div className="versions-side-menu">
           <button onClick={() => setIsSideMenuOpen(false)} className="side-menu-close-button">X</button>
           <h2>Versions</h2>
-          <ul>
-            {mockVersions.map(version => (
-              <li key={version.id} onDoubleClick={() => handleOpenVersionForReview(version)}>
-                <strong>{version.name}</strong> ({version.timestamp})
-                {/* Basic thumbnail/preview could go here */}
-              </li>
-            ))}
-          </ul>
+          {isLoadingVersions ? (
+            <p>Loading versions...</p>
+          ) : (
+            <ul>
+              {versions.length === 0 ? (
+                <li style={{ padding: '10px', fontStyle: 'italic' }}>No versions saved yet</li>
+              ) : (
+                versions.map(version => (
+                  <li key={version.id}>
+                    <div onDoubleClick={() => handleOpenVersionForReview(version)} style={{ cursor: 'pointer' }}>
+                      <strong>{version.name}</strong> ({version.timestamp})
+                    </div>
+                    <button 
+                      onClick={() => deleteVersion(version.id)}
+                      style={{
+                        marginTop: '5px',
+                        padding: '2px 8px',
+                        fontSize: '12px',
+                        backgroundColor: '#ff4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
         </div>
       )}
 
-      <div className={`editor-wrapper ${isReviewing ? 'review-mode' : 'single-mode'}`}>
+      <div className={`editor-wrapper ${isReviewing ? 'review-mode' : 'single-mode'} ${isAIToolOpen ? 'ai-tool-open' : ''}`}>
         <div className={`main-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
           <TiptapEditor 
             initialContent={mainContentForEditor}
@@ -151,12 +274,12 @@ export default function WritingCanvasPage() {
               key={selectedReviewVersion.id}
               initialContent={selectedReviewVersion.content}
               onContentChange={() => {}}
-              isEditable={true}
+              isEditable={false}
             />
           </div>
         )}
+        {isAIToolOpen && <AITool />}
       </div>
-      {isAIToolOpen && <AITool/> }
       
     </main>
   );
