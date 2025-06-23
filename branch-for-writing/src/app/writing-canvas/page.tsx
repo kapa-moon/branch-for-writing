@@ -60,6 +60,9 @@ export default function WritingCanvasPage() {
   // Add this state variable with your other useState declarations (around line 48)
   const [selectedText, setSelectedText] = useState<string>('');
 
+  // NEW: Add state for toggleable info card
+  const [showVersionsInfo, setShowVersionsInfo] = useState<boolean>(false);
+
   // Load main document from local storage on mount
   useEffect(() => {
     const savedContentString = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -258,7 +261,31 @@ export default function WritingCanvasPage() {
       {isSideMenuOpen && (
         <div className="versions-side-menu">
           <button onClick={() => setIsSideMenuOpen(false)} className="side-menu-close-button">X</button>
-          <h2>Versions</h2>
+          
+          <div className="versions-header">
+            <h2>Versions</h2>
+            <button 
+              onClick={() => setShowVersionsInfo(!showVersionsInfo)}
+              className="info-toggle-button"
+              title="Show help"
+            >
+              ℹ️
+            </button>
+          </div>
+          
+          {/* NEW: Toggleable UX Hint Card */}
+          {showVersionsInfo && (
+            <div className="versions-info-card">
+              <h4>How to Compare & Diff:</h4>
+              <p>
+                <strong>Double-click</strong> on any version below to open it for comparison with your current writing.
+              </p>
+              <p>
+                Then click <strong>"Diff & Merge"</strong> to see changes and selectively merge content.
+              </p>
+            </div>
+          )}
+
           {isLoadingVersions ? (
             <p>Loading versions...</p>
           ) : (
@@ -307,22 +334,20 @@ export default function WritingCanvasPage() {
         {isReviewing && selectedReviewVersion && (
           <div className={`review-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
             <div className="review-header">
-              <button onClick={handleCloseReview} className="close-review-button">Close Review</button>
-              <button 
-                onClick={() => setDiffMode(!diffMode)} 
-                className="diff-mode-button"
-                style={{
-                  backgroundColor: diffMode ? '#ffc107' : '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  marginLeft: '10px'
-                }}
-              >
-                {diffMode ? 'Normal View' : 'Diff & Merge'}
-              </button>
+              <h4 style={{ margin: 0, color: '#495057', fontSize: '1rem' }}>
+                Comparing with: <span style={{ fontWeight: 600, color: '#007bff' }}>{selectedReviewVersion.name}</span>
+              </h4>
+              <div className="review-buttons">
+                <button 
+                  onClick={() => setDiffMode(!diffMode)} 
+                  className={`diff-mode-button ${diffMode ? 'diff-view' : 'normal-view'}`}
+                >
+                  {diffMode ? 'Normal View' : 'Diff & Merge'}
+                </button>
+                <button onClick={handleCloseReview} className="close-review-button">
+                  Close Review
+                </button>
+              </div>
             </div>
             {diffMode ? (
               <DiffTiptapEditor 

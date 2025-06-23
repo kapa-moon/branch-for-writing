@@ -345,13 +345,12 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
               ))}
             </div>
 
-            {/* CLEANED UP: Chat Input */}
+            {/* UPDATED: Chat Input */}
             <div className="chat-input-section">
               <div className="chat-input-wrapper">
                 <textarea
                   value={currentMessage}
                   onChange={(e) => setCurrentMessage(e.target.value)}
-                  placeholder="Ask about your writing, identity themes, or get advice..."
                   className="chat-input"
                   rows={3}
                   onKeyDown={(e) => {

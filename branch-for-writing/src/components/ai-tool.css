@@ -398,7 +398,13 @@
   padding: 8px;
   font-family: inherit;
   font-size: 0.9rem;
-  resize: vertical;
+  resize: none;
+  outline: none;
+}
+
+.chat-input:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .chat-send-button {
