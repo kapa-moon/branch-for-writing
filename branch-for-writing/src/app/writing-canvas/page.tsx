@@ -4,9 +4,12 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import TiptapEditor from '@/components/TiptapEditor';
+import DiffTiptapEditor from '@/components/DiffTiptapEditor';
+import EnhancedAITool from '@/components/EnhancedAITool';
 import './writing-canvas.css';
 import { TiptapDocument } from '@/types/tiptap';
 import AITool from '@/components/AITool';
+import { DocumentDiffEngine } from '@/lib/diffEngine';
 
 const LOCAL_STORAGE_KEY = 'tiptap-main-document';
 
@@ -50,6 +53,9 @@ export default function WritingCanvasPage() {
   const [versions, setVersions] = useState<Version[]>([]);
   const [isLoadingVersions, setIsLoadingVersions] = useState<boolean>(false);
   const [isSavingVersion, setIsSavingVersion] = useState<boolean>(false);
+  
+  // NEW: Add diff mode state
+  const [diffMode, setDiffMode] = useState<boolean>(false);
 
   // Load main document from local storage on mount
   useEffect(() => {
@@ -167,11 +173,32 @@ export default function WritingCanvasPage() {
     setSelectedReviewVersion(version);
     setIsReviewing(true);
     setIsSideMenuOpen(false);
+    // Reset diff mode when opening a new version
+    setDiffMode(false);
   };
 
   const handleCloseReview = () => {
     setIsReviewing(false);
     setSelectedReviewVersion(null);
+    setDiffMode(false);
+  };
+
+  // NEW: Handle merging segments from diff view
+  const handleMergeSegments = (selectedSegmentIds: string[]) => {
+    if (!selectedReviewVersion) return;
+    
+    const diffEngine = new DocumentDiffEngine();
+    const segments = diffEngine.generateSemanticDiff(mainDocumentContent, selectedReviewVersion.content);
+    const mergedContent = diffEngine.mergeSegments(mainDocumentContent, segments, selectedSegmentIds);
+    
+    setMainDocumentContent(mergedContent);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mergedContent));
+    
+    // Show success message
+    alert(`Merged ${selectedSegmentIds.length} segments successfully!`);
+    
+    // Optionally close diff mode after merge
+    setDiffMode(false);
   };
 
   if (isPending) {
@@ -267,18 +294,50 @@ export default function WritingCanvasPage() {
             isEditable={true}
           />
         </div>
+        {/* UPDATED: Enhanced review editor with diff functionality */}
         {isReviewing && selectedReviewVersion && (
           <div className={`review-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
-            <button onClick={handleCloseReview} className="close-review-button">Close Review</button>
-            <TiptapEditor 
-              key={selectedReviewVersion.id}
-              initialContent={selectedReviewVersion.content}
-              onContentChange={() => {}}
-              isEditable={false}
-            />
+            <div className="review-header">
+              <button onClick={handleCloseReview} className="close-review-button">Close Review</button>
+              <button 
+                onClick={() => setDiffMode(!diffMode)} 
+                className="diff-mode-button"
+                style={{
+                  backgroundColor: diffMode ? '#ffc107' : '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  marginLeft: '10px'
+                }}
+              >
+                {diffMode ? 'Normal View' : 'Diff & Merge'}
+              </button>
+            </div>
+            {diffMode ? (
+              <DiffTiptapEditor 
+                originalContent={mainDocumentContent}
+                comparisonContent={selectedReviewVersion.content}
+                onMergeSegments={handleMergeSegments}
+              />
+            ) : (
+              <TiptapEditor 
+                key={selectedReviewVersion.id}
+                initialContent={selectedReviewVersion.content}
+                onContentChange={() => {}}
+                isEditable={false}
+              />
+            )}
           </div>
         )}
-        {isAIToolOpen && <AITool />}
+        {/* UPDATED: Enhanced AI Tool */}
+        {isAIToolOpen && (
+          <EnhancedAITool 
+            mainContent={mainDocumentContent} 
+            comparisonContent={selectedReviewVersion?.content} 
+          />
+        )}
       </div>
       
     </main>

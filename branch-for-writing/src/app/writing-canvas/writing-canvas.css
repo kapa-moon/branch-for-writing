@@ -191,3 +191,47 @@ body {
 .ProseMirror {
     font-family: 'Atkinson Hyperlegible', serif;
 }
+
+/* Add these styles to your existing writing-canvas.css file */
+
+.review-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 10px;
+  border-radius: 8px 8px 0 0;
+}
+
+.close-review-button {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.close-review-button:hover {
+  background: #c82333;
+}
+
+.diff-mode-button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* Adjust the editor container to account for header */
+.review-editor-container .ProseMirror {
+  flex-grow: 1;
+  min-height: 150px; /* Reduced to account for header */
+}
+
+/* Style adjustments for diff mode */
+.review-editor-container .diff-editor-container {
+  height: calc(100% - 60px); /* Account for header */
+  border-radius: 0 0 8px 8px;
+}
