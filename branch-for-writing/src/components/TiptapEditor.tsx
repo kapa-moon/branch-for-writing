@@ -9,10 +9,11 @@ import { TiptapDocument } from '@/types/tiptap';
 interface TiptapEditorProps {
   initialContent: TiptapDocument | null;
   onContentChange: (content: TiptapDocument) => void;
+  onTextSelection?: (selectedText: string) => void;
   isEditable?: boolean;
 }
 
-const TiptapEditor = ({ initialContent, onContentChange, isEditable = true }: TiptapEditorProps) => {
+const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEditable = true }: TiptapEditorProps) => {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -25,6 +26,19 @@ const TiptapEditor = ({ initialContent, onContentChange, isEditable = true }: Ti
     onUpdate: ({ editor: currentEditor }) => {
       if (isEditable) {
         onContentChange(currentEditor.getJSON() as TiptapDocument);
+      }
+    },
+    onSelectionUpdate: ({ editor: currentEditor }) => {
+      if (onTextSelection && isEditable) {
+        const { from, to } = currentEditor.state.selection;
+        
+        if (from !== to) {
+          const selectedText = currentEditor.state.doc.textBetween(from, to, ' ');
+          
+          if (selectedText.trim().length > 3) {
+            onTextSelection(selectedText.trim());
+          }
+        }
       }
     },
     editorProps: {

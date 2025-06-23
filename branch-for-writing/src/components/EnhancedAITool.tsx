@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { TiptapDocument } from '@/types/tiptap';
 import { DocumentDiffEngine } from '@/lib/diffEngine';
 import './ai-tool.css';
@@ -45,27 +45,31 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
   const [reconciliationSuggestions, setReconciliationSuggestions] = useState<ReconciliationSuggestion[]>([]);
   
   // Chat State
-  const [contextItems, setContextItems] = useState<ContextItem[]>([]);
+  const [currentContext, setCurrentContext] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
 
-  // Add selected text to context
+  // CLEANED UP: Manual add without excessive feedback
   const addToContext = useCallback(() => {
-    if (selectedText && selectedText.trim()) {
-      const newContext: ContextItem = {
-        id: Date.now().toString(),
-        text: selectedText.trim(),
-        timestamp: new Date()
-      };
-      setContextItems(prev => [...prev, newContext]);
-    } else if (onRequestTextSelection) {
-      onRequestTextSelection();
+    if (!selectedText || selectedText.trim().length <= 3) {
+      alert('Please select text in the main editor first.');
+      return;
     }
-  }, [selectedText, onRequestTextSelection]);
 
-  // Remove context item
-  const removeContext = (id: string) => {
-    setContextItems(prev => prev.filter(item => item.id !== id));
+    const textToAdd = selectedText.trim();
+    
+    // Check if this is the same text as already in context
+    if (currentContext === textToAdd) {
+      return; // Silently ignore if same text
+    }
+
+    // Add to context
+    setCurrentContext(textToAdd);
+  }, [selectedText, currentContext]);
+
+  // Clear context
+  const clearContext = () => {
+    setCurrentContext('');
   };
 
   // Identity Diff Analysis
@@ -125,12 +129,18 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
     }
   }, [identityAnalysis, mainContent, comparisonContent]);
 
-  // Chat with context
+  // FIXED: Chat with context and clear after sending
   const sendChatMessage = useCallback(async () => {
     if (!currentMessage.trim()) return;
     
     const userMessage = currentMessage.trim();
+    const contextForThisMessage = currentContext; // Capture current context
+    
+    // Clear inputs immediately
     setCurrentMessage('');
+    setCurrentContext(''); // FIXED: Clear context after sending
+    
+    // Add user message to history
     setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
     
     setIsAnalyzing(true);
@@ -142,7 +152,7 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
           message: userMessage,
           mainContent,
           comparisonContent,
-          contextItems,
+          selectedContext: contextForThisMessage, // Send the context that was selected
           chatHistory
         })
       });
@@ -155,7 +165,7 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
     } finally {
       setIsAnalyzing(false);
     }
-  }, [currentMessage, mainContent, comparisonContent, contextItems, chatHistory]);
+  }, [currentMessage, currentContext, mainContent, comparisonContent, chatHistory]);
 
   return (
     <div className="ai-tool-wrapper enhanced">
@@ -271,45 +281,63 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
         </div>
       )}
 
-      {/* Chat Tab */}
+      {/* CLEANED UP: Chat Tab */}
       {activeTab === 'chat' && (
         <div className="ai-tab-content">
           <div className="ai-section">
             <h3>AI Chat with Context</h3>
             
-            {/* Context Management */}
+            {/* CLEANED UP: Context Management */}
             <div className="context-section">
               <div className="context-header">
                 <h4>Selected Context</h4>
                 <button 
                   onClick={addToContext}
-                  className="ai-button secondary small"
+                  className={`ai-button secondary small ${selectedText && selectedText.length > 3 ? 'highlight' : ''}`}
+                  disabled={!selectedText || selectedText.length <= 3}
                 >
-                  {selectedText ? 'Add Selected Text' : 'Select Text to Add'}
+                  {selectedText && selectedText.length > 3 ? 'Add Selected Text' : 'Select Text First'}
                 </button>
               </div>
               
-              {contextItems.length > 0 ? (
-                <div className="context-items">
-                  {contextItems.map(item => (
-                    <div key={item.id} className="context-item">
-                      <div className="context-text">"{item.text}"</div>
-                      <button 
-                        onClick={() => removeContext(item.id)}
-                        className="context-remove"
-                      >
-                        ×
-                      </button>
+              {currentContext ? (
+                <div className="context-display">
+                  <div className="context-item active">
+                    <div className="context-text">
+                      "{currentContext.length > 150 ? currentContext.substring(0, 150) + '...' : currentContext}"
                     </div>
-                  ))}
+                    <button 
+                      onClick={clearContext}
+                      className="context-remove"
+                      title="Clear context"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <p className="no-context">No context selected. Select text in your document and click "Add Selected Text".</p>
+                <div className="no-context-guide">
+                  <p className="no-context">No context selected yet.</p>
+                  <div className="context-steps">
+                    <small>
+                      <strong>How to add context:</strong><br/>
+                      1. Select text in the main editor (left panel)<br/>
+                      2. Click "Add Selected Text" button above<br/>
+                      3. Ask your question with that context
+                    </small>
+                  </div>
+                </div>
               )}
             </div>
 
             {/* Chat History */}
             <div className="chat-history">
+              {chatHistory.length === 0 && (
+                <div className="chat-placeholder">
+                  <p>💬 Start a conversation about your writing!</p>
+                  <small>Tip: Add context first to get more specific help.</small>
+                </div>
+              )}
               {chatHistory.map((message, index) => (
                 <div key={index} className={`chat-message ${message.role}`}>
                   <div className="message-content">{message.content}</div>
@@ -317,7 +345,7 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
               ))}
             </div>
 
-            {/* Chat Input */}
+            {/* CLEANED UP: Chat Input */}
             <div className="chat-input-section">
               <div className="chat-input-wrapper">
                 <textarea

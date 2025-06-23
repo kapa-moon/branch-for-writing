@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, mainContent, comparisonContent, contextItems, chatHistory } = await request.json();
+    const { message, mainContent, comparisonContent, selectedContext, chatHistory } = await request.json();
     
-    const response = await generateContextualResponse(message, mainContent, comparisonContent, contextItems, chatHistory);
+    const response = await generateContextualResponse(message, mainContent, comparisonContent, selectedContext, chatHistory);
     
     return NextResponse.json({ response });
   } catch (error) {
@@ -17,12 +17,11 @@ async function generateContextualResponse(
   message: string, 
   mainContent: any, 
   comparisonContent: any, 
-  contextItems: any[], 
+  selectedContext: string,
   chatHistory: any[]
 ) {
   const mainText = documentToText(mainContent);
   const comparisonText = comparisonContent ? documentToText(comparisonContent) : '';
-  const selectedContext = contextItems.map(item => item.text).join('\n---\n');
   
   const prompt = `You are an AI assistant helping someone with personal narrative writing and identity exploration.
 
@@ -31,7 +30,7 @@ ${mainText}
 
 ${comparisonText ? `COMPARISON VERSION:\n${comparisonText}` : ''}
 
-${selectedContext ? `SELECTED CONTEXT:\n${selectedContext}` : ''}
+${selectedContext ? `SELECTED CONTEXT:\n"${selectedContext}"` : ''}
 
 CHAT HISTORY:
 ${chatHistory.map(h => `${h.role}: ${h.content}`).join('\n')}
@@ -42,9 +41,9 @@ Respond helpfully about their writing, identity themes, or provide guidance. Ref
 
   // Mock response - replace with actual AI API call
   if (selectedContext) {
-    return `I can see you're referring to "${selectedContext.substring(0, 50)}...". This part of your writing shows [analysis based on context]. How does this relate to your question about "${message}"?`;
+    return `I can see you're referring to "${selectedContext.substring(0, 50)}...". This part of your writing suggests [analysis based on context]. Regarding your question "${message}", I'd say [helpful response].`;
   } else {
-    return `Based on your writing, I notice [general observation]. Regarding your question "${message}", I'd suggest [helpful response].`;
+    return `Based on your overall writing, I notice [general observation]. About your question "${message}", I'd suggest [helpful response].`;
   }
 }
 

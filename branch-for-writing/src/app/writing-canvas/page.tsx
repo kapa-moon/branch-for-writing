@@ -57,6 +57,9 @@ export default function WritingCanvasPage() {
   // NEW: Add diff mode state
   const [diffMode, setDiffMode] = useState<boolean>(false);
 
+  // Add this state variable with your other useState declarations (around line 48)
+  const [selectedText, setSelectedText] = useState<string>('');
+
   // Load main document from local storage on mount
   useEffect(() => {
     const savedContentString = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -201,6 +204,11 @@ export default function WritingCanvasPage() {
     setDiffMode(false);
   };
 
+  // Add this handler function after your other handler functions
+  const handleTextSelection = (text: string) => {
+    setSelectedText(text);
+  };
+
   if (isPending) {
     return <main style={{ textAlign: 'center', padding: '50px' }}><p>Loading Writing Canvas...</p></main>;
   }
@@ -291,6 +299,7 @@ export default function WritingCanvasPage() {
           <TiptapEditor 
             initialContent={mainContentForEditor}
             onContentChange={handleMainContentChange}
+            onTextSelection={handleTextSelection}
             isEditable={true}
           />
         </div>
@@ -335,7 +344,11 @@ export default function WritingCanvasPage() {
         {isAIToolOpen && (
           <EnhancedAITool 
             mainContent={mainDocumentContent} 
-            comparisonContent={selectedReviewVersion?.content} 
+            comparisonContent={selectedReviewVersion?.content}
+            selectedText={selectedText}
+            onRequestTextSelection={() => {
+              alert('Please select text in the main editor (left panel) to add to context.');
+            }}
           />
         )}
       </div>
