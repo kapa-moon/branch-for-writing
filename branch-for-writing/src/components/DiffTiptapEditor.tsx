@@ -280,14 +280,16 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
         const allCards = getAllCards();
         return (
           <div className="comparison-view holistic-view">
-            <h3>Holistic Identity Analysis</h3>
+            <div className="holistic-upper">
+              {renderHolisticSummary()}
+            </div>
             
-            {renderHolisticSummary()}
-            
-            <div className="thumbnail-section">
-              <h4>All Comparison Cards</h4>
-              <div className="thumbnail-grid">
-                {allCards.map((card, index) => renderComparisonCard(card, index, true))}
+            <div className="holistic-lower">
+              <div className="thumbnail-section">
+                <h4>All Comparison Cards</h4>
+                <div className="thumbnail-grid">
+                  {allCards.map((card, index) => renderComparisonCard(card, index, true))}
+                </div>
               </div>
             </div>
           </div>
@@ -296,9 +298,8 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
       case 'overlapping':
         return (
           <div className="comparison-view">
-            <h3>Overlapping Themes</h3>
             <p className="view-description">
-              Shared identity themes between versions
+              ℹ️ Shared identity themes between versions
             </p>
             <div className="cards-container">
               {diffResult.overlapping.length > 0 ? 
@@ -312,9 +313,8 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
       case 'unique':
         return (
           <div className="comparison-view">
-            <h3>Unique Themes</h3>
             <p className="view-description">
-              Themes appearing in only one version
+            ℹ️ Themes appearing in only one version
             </p>
             
             <div className="unique-sections">
@@ -344,9 +344,8 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
       case 'conflicts':
         return (
           <div className="comparison-view">
-            <h3>Identity Conflicts</h3>
             <p className="view-description">
-              Contradictory identity representations
+            ℹ️ Contradictory identity representations
             </p>
             <div className="cards-container">
               {diffResult.conflicts.length > 0 ? 
