@@ -33,12 +33,13 @@ export class DocumentDiffEngine {
   constructor() {
     // FIXED: Try different instantiation approaches
     try {
-      // Try the default export approach
-      this.dmp = new DMP.DiffMatchPatch();
+      // Most common: library exposes `diff_match_patch` constructor
+      this.dmp = new (DMP as any).diff_match_patch();
     } catch (e) {
       try {
-        // Try direct instantiation
-        this.dmp = new (DMP as any)();
+        // Fallback: if a default export is provided
+        const DefaultCtor = (DMP as any).default ?? (DMP as any);
+        this.dmp = new DefaultCtor();
       } catch (e2) {
         // Fallback to basic diff if library fails
         console.warn('diff-match-patch library failed to initialize, using basic diff');
@@ -116,7 +117,7 @@ export class DocumentDiffEngine {
     revised.forEach((rev, revIdx) => {
       if (usedRevised.has(revIdx)) return;
       
-      let bestMatch = null;
+      let bestMatch: { original: any; originalIndex: number } | null = null;
       let bestSimilarity = 0;
       
       original.forEach((orig, origIdx) => {
@@ -130,15 +131,16 @@ export class DocumentDiffEngine {
       });
 
       if (bestMatch) {
+        const bm: any = bestMatch;
         alignments.push({
           type: 'modify',
-          original: bestMatch.original,
+          original: bm.original,
           revised: rev,
-          originalIndex: bestMatch.originalIndex,
+          originalIndex: bm.originalIndex,
           revisedIndex: revIdx,
           similarity: bestSimilarity
         });
-        usedOriginal.add(bestMatch.originalIndex);
+        usedOriginal.add(bm.originalIndex);
         usedRevised.add(revIdx);
       }
     });
@@ -259,10 +261,8 @@ export class DocumentDiffEngine {
     let newContent = [...(mainDoc.content || [])];
     
     // Sort by type: deletes first, then modifications, then additions
-    const sortedSegments = selectedSegments.sort((a, b) => {
-      const order = { delete: 0, modify: 1, add: 2 };
-      return order[a.diffType] - order[b.diffType];
-    });
+    const order: Record<string, number> = { delete: 0, modify: 1, add: 2, unchanged: 3 };
+    const sortedSegments = selectedSegments.sort((a, b) => order[a.diffType] - order[b.diffType]);
     
     sortedSegments.forEach(segment => {
       switch (segment.diffType) {

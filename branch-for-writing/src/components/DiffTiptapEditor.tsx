@@ -114,10 +114,10 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
     setCardStates(prev => ({
       ...prev,
       [cardId]: {
-        status: 'active',
-        expandedMain: false,
-        expandedComparison: false,
         ...prev[cardId],
+        status: prev[cardId]?.status || 'active',
+        expandedMain: prev[cardId]?.expandedMain || false,
+        expandedComparison: prev[cardId]?.expandedComparison || false,
         [field]: !prev[cardId]?.[field]
       }
     }));
@@ -125,6 +125,45 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
 
   const truncateText = (text: string, maxLength: number = 100) => {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
+  const getCardViewMode = (comparison: ThemeComparison): ViewMode => {
+    // Determine which tab/view this card belongs to based on its type
+    switch (comparison.type) {
+      case 'overlapping':
+        return 'overlapping';
+      case 'unique':
+        return 'unique';
+      case 'conflict':
+        return 'conflicts';
+      case 'holistic':
+      default:
+        // For holistic cards, we need to check which array they came from
+        if (!diffResult) return 'holistic';
+        
+        // Check if it's in overlapping
+        if (diffResult.overlapping.find(card => card.description === comparison.description)) {
+          return 'overlapping';
+        }
+        // Check if it's in unique arrays
+        if (diffResult.unique.mainNarrative.find(card => card.description === comparison.description) ||
+            diffResult.unique.comparisonNarrative.find(card => card.description === comparison.description)) {
+          return 'unique';
+        }
+        // Check if it's in conflicts
+        if (diffResult.conflicts.find(card => card.description === comparison.description)) {
+          return 'conflicts';
+        }
+        
+        return 'holistic';
+    }
+  };
+
+  const handleThumbnailClick = (comparison: ThemeComparison) => {
+    const targetView = getCardViewMode(comparison);
+    if (targetView !== 'holistic') {
+      setCurrentView(targetView);
+    }
   };
 
   const renderComparisonCard = (comparison: ThemeComparison, index: number, isThumnail: boolean = false) => {
@@ -135,6 +174,8 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
       <div 
         key={cardId} 
         className={`comparison-card ${comparison.category} ${comparison.type} ${cardState.status} ${isThumnail ? 'thumbnail' : ''}`}
+        onClick={isThumnail ? () => handleThumbnailClick(comparison) : undefined}
+        style={isThumnail ? { cursor: 'pointer' } : undefined}
       >
         <div className="card-header">
           <div className="card-badges">
@@ -262,7 +303,7 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
 
     return (
       <div className="holistic-summary">
-        <h4>Overview Summary</h4>
+        <h4> Summary</h4>
         <ul className="summary-points">
           {summaryPoints.map((point, index) => (
             <li key={index} className="summary-point">{point}</li>
@@ -286,7 +327,7 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
             
             <div className="holistic-lower">
               <div className="thumbnail-section">
-                <h4>All Comparison Cards</h4>
+                <h4>Comparison Cards</h4>
                 <div className="thumbnail-grid">
                   {allCards.map((card, index) => renderComparisonCard(card, index, true))}
                 </div>
@@ -373,7 +414,6 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
   return (
     <div className="diff-editor-container">
       <div className="diff-header">
-        <h2>Identity-Level Narrative Comparison</h2>
         <div className="view-selector">
           {(['holistic', 'overlapping', 'unique', 'conflicts'] as ViewMode[]).map((mode) => (
             <button

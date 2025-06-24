@@ -9,8 +9,8 @@
 
 /* === HEADER STYLES === */
 .diff-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #f8f9fa;
+  color: #000;
   padding: 16px 20px;
   border-bottom: 1px solid #dee2e6;
   flex-shrink: 0;
@@ -29,9 +29,9 @@
 }
 
 .view-button {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  background: white;
+  border: 1px solid #000;
+  color: #000;
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 0.85rem;
@@ -40,13 +40,13 @@
 }
 
 .view-button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #e6f3ff;
 }
 
 .view-button.active {
-  background: white;
-  color: #667eea;
-  font-weight: 600;
+  background: #e6f3ff;
+  color: #000;
+  font-weight: bold;
 }
 
 /* === CONTENT LAYOUT - FIXED === */
@@ -975,37 +975,50 @@
 
 .holistic-upper {
   height: 40%;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   padding: 0;
   margin: 0;
 }
 
 .holistic-lower {
   height: 60%;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   padding: 0;
   margin: 0;
   border-top: 1px solid #e5e7eb;
 }
 
 .holistic-summary {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background: #f8fafc;
-  padding: 12px;
+  padding: 0;
   border-radius: 0;
   border-left: none;
   margin: 0;
 }
 
 .holistic-summary h4 {
-  margin: 0 0 12px 0;
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  z-index: 10;
+  margin: 0;
+  padding: 12px;
   color: #1f2937;
   font-size: 1.1rem;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .summary-points {
   list-style: none;
-  padding: 0;
+  padding: 12px;
   margin: 0;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .summary-point {
@@ -1026,23 +1039,34 @@
 
 /* Thumbnail Section */
 .thumbnail-section {
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
   margin: 0;
 }
 
 .thumbnail-section h4 {
-  margin: 0 0 12px 0;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 10;
+  margin: 0;
+  padding: 12px;
   color: #1f2937;
   font-size: 1rem;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .thumbnail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 8px;
-  padding: 0;
+  padding: 12px;
   background: transparent;
   border-radius: 0;
+  overflow-y: auto;
+  flex: 1;
 }
 
 /* Thumbnail Card Styles */
@@ -1052,29 +1076,38 @@
   cursor: pointer;
   transition: none;
   border-radius: 0;
+  border: 1px solid #e5e7eb;
 }
 
 .comparison-card.thumbnail:hover {
   transform: none;
   box-shadow: none;
   background: #f9fafb;
+  border-color: #9ca3af;
 }
 
-.comparison-card {
-  border-radius: 0;
-  border-left: none;
+.comparison-card.thumbnail:active {
+  background: #f3f4f6;
 }
 
-.comparison-card.affective,
-.comparison-card.motivational,
-.comparison-card.integrative,
-.comparison-card.structural {
-  border-left: none;
+/* Add visual indicator for clickable thumbnails */
+.holistic-view .thumbnail-grid .comparison-card::after {
+  content: "→";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.comparison-card.thumbnail .card-title {
-  font-size: 0.9rem;
-  margin-bottom: 0;
+.holistic-view .thumbnail-grid .comparison-card {
+  position: relative;
+}
+
+.holistic-view .thumbnail-grid .comparison-card:hover::after {
+  opacity: 1;
 }
 
 /* Cards Container */
@@ -1195,4 +1228,37 @@
   margin: 0;
   padding: 0;
   font-size: 0.8rem;
+}
+
+.comparison-card {
+  border-radius: 0;
+  border-left: none;
+}
+
+.comparison-card.affective,
+.comparison-card.motivational,
+.comparison-card.integrative,
+.comparison-card.structural {
+  border-left: none;
+}
+
+.comparison-card.thumbnail .card-title {
+  font-size: 0.9rem;
+  margin-bottom: 0;
+}
+
+/* Add back simple left borders for holistic view comparison cards - same style as other borders */
+.holistic-view .comparison-card {
+  border-left: 1px solid #e5e7eb;
+}
+
+/* Override all colored borders with simple border */
+.holistic-view .comparison-card.affective,
+.holistic-view .comparison-card.motivational,
+.holistic-view .comparison-card.integrative,
+.holistic-view .comparison-card.structural,
+.holistic-view .comparison-card.overlapping,
+.holistic-view .comparison-card.unique,
+.holistic-view .comparison-card.conflict {
+  border-left: 1px solid #e5e7eb !important;
 } 
