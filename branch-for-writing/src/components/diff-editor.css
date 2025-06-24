@@ -641,4 +641,464 @@
   color: #4a5568;
   line-height: 1.5;
   font-style: italic;
+}
+
+/* === COMPARISON CARD STYLES === */
+.comparison-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  transition: all 0.2s ease;
+  border-left: 4px solid transparent;
+}
+
+.comparison-card.affective {
+  border-left-color: #ef4444;
+}
+
+.comparison-card.motivational {
+  border-left-color: #3b82f6;
+}
+
+.comparison-card.integrative {
+  border-left-color: #10b981;
+}
+
+.comparison-card.structural {
+  border-left-color: #f59e0b;
+}
+
+/* FIX 3: Proper gray-out styling for resolved/ignored cards */
+.comparison-card.resolved,
+.comparison-card.ignored {
+  background: #f5f5f5 !important;
+  border-color: #d1d5db !important;
+  border-left-color: #9ca3af !important;
+  filter: grayscale(100%);
+  opacity: 0.8;
+}
+
+.comparison-card.resolved *,
+.comparison-card.ignored * {
+  color: #6b7280 !important;
+  background-color: transparent !important;
+  border-color: #d1d5db !important;
+}
+
+.comparison-card.resolved .evidence-text,
+.comparison-card.ignored .evidence-text {
+  background: #f3f4f6 !important;
+  border-left-color: #9ca3af !important;
+}
+
+.comparison-card.resolved .rationale-section,
+.comparison-card.ignored .rationale-section {
+  background: #f3f4f6 !important;
+  border-left-color: #9ca3af !important;
+}
+
+/* Card Header */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.card-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.theme-category {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  text-transform: capitalize;
+}
+
+.theme-category.affective {
+  background: #ffe6e6;
+  color: #c53030;
+}
+
+.theme-category.motivational {
+  background: #e6f3ff;
+  color: #2b6cb0;
+}
+
+.theme-category.integrative {
+  background: #e6ffe6;
+  color: #38a169;
+}
+
+.theme-category.structural {
+  background: #fff3e6;
+  color: #dd6b20;
+}
+
+.status-badge {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.resolved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.ignored {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Card Actions */
+.card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.action-btn {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.resolve-btn {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.resolve-btn:hover {
+  background: #bbf7d0;
+}
+
+.merge-btn {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.merge-btn:hover {
+  background: #bfdbfe;
+}
+
+.ignore-btn {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.ignore-btn:hover {
+  background: #e5e7eb;
+}
+
+/* Card Content */
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px 0;
+  line-height: 1.3;
+}
+
+/* Evidence Section */
+.evidence-section {
+  margin-bottom: 16px;
+}
+
+.evidence-item {
+  margin-bottom: 12px;
+}
+
+.evidence-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.evidence-header strong {
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.expand-btn {
+  font-size: 0.75rem;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.expand-btn:hover {
+  color: #374151;
+}
+
+.evidence-text {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-style: italic;
+}
+
+.main-evidence .evidence-text {
+  background: #ebf8ff;
+  border-left: 3px solid #3b82f6;
+}
+
+.comparison-evidence .evidence-text {
+  background: #f0fff4;
+  border-left: 3px solid #10b981;
+}
+
+/* Rationale Section */
+.rationale-section {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 3px solid #e2e8f0;
+}
+
+.rationale-section h5 {
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.rationale-section p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #4a5568;
+  line-height: 1.5;
+}
+
+/* FIX 2: Confirmation Modal Styles */
+.confirmation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirmation-modal {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.confirmation-modal h4 {
+  margin: 0 0 12px 0;
+  color: #1f2937;
+  font-size: 1.1rem;
+}
+
+.confirmation-modal p {
+  margin: 0 0 20px 0;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirm-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-btn.resolve {
+  background: #10b981;
+  color: white;
+}
+
+.confirm-btn.resolve:hover {
+  background: #059669;
+}
+
+.confirm-btn.ignore {
+  background: #6b7280;
+  color: white;
+}
+
+.confirm-btn.ignore:hover {
+  background: #4b5563;
+}
+
+.cancel-btn {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background: #f9fafb;
+}
+
+/* === HOLISTIC VIEW STYLES === */
+.holistic-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.holistic-summary {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #6366f1;
+}
+
+.holistic-summary h4 {
+  margin: 0 0 16px 0;
+  color: #1f2937;
+  font-size: 1.1rem;
+}
+
+.summary-points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.summary-point {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border-left: 3px solid #e2e8f0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.summary-point:last-child {
+  margin-bottom: 0;
+}
+
+/* Thumbnail Section */
+.thumbnail-section h4 {
+  margin: 0 0 16px 0;
+  color: #1f2937;
+  font-size: 1rem;
+}
+
+.thumbnail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+/* Thumbnail Card Styles */
+.comparison-card.thumbnail {
+  padding: 12px;
+  margin-bottom: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.comparison-card.thumbnail:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.comparison-card.thumbnail .card-title {
+  font-size: 0.9rem;
+  margin-bottom: 0;
+}
+
+/* Cards Container */
+.cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Full Width Panel */
+.analysis-panel.full-width {
+  border-right: none;
+}
+
+/* Unique Sections Update */
+.unique-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.unique-main, .unique-comparison {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.unique-main h4, .unique-comparison h4 {
+  margin: 0 0 16px 0;
+  color: #495057;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .unique-sections {
+    grid-template-columns: 1fr;
+  }
+  
+  .thumbnail-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .card-actions {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .confirmation-modal {
+    margin: 20px;
+  }
 } 

@@ -16,7 +16,17 @@ interface DiffTiptapEditorProps {
   onMergeSegments: (selectedSegmentIds: string[]) => void;
 }
 
-type ViewMode = 'holistic' | 'overlapping' | 'unique' | 'conflicts' | 'themes';
+type ViewMode = 'holistic' | 'overlapping' | 'unique' | 'conflicts';
+
+type CardStatus = 'active' | 'resolved' | 'ignored';
+
+interface CardState {
+  [cardId: string]: {
+    status: CardStatus;
+    expandedMain: boolean;
+    expandedComparison: boolean;
+  };
+}
 
 const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({ 
   originalContent, 
@@ -24,10 +34,14 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
   onMergeSegments 
 }) => {
   const [diffResult, setDiffResult] = useState<IdentityDiffResult | null>(null);
-  const [mergeableSegments, setMergeableSegments] = useState<MergeableThemeSegment[]>([]);
-  const [selectedSegments, setSelectedSegments] = useState<Set<string>>(new Set());
   const [currentView, setCurrentView] = useState<ViewMode>('holistic');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [cardStates, setCardStates] = useState<CardState>({});
+  const [confirmAction, setConfirmAction] = useState<{
+    cardId: string;
+    action: 'resolve' | 'merge' | 'ignore';
+    show: boolean;
+  }>({ cardId: '', action: 'resolve', show: false });
 
   useEffect(() => {
     analyzeDifferences();
@@ -38,10 +52,28 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
     try {
       const diffEngine = new IdentityDiffEngine();
       const result = await diffEngine.generateIdentityDiff(originalContent, comparisonContent);
-      const segments = diffEngine.generateMergeableSegments(originalContent, comparisonContent, result);
       
       setDiffResult(result);
-      setMergeableSegments(segments);
+      
+      const initialCardStates: CardState = {};
+      const allCards = [
+        ...result.holistic,
+        ...result.overlapping,
+        ...result.unique.mainNarrative,
+        ...result.unique.comparisonNarrative,
+        ...result.conflicts
+      ];
+      
+      allCards.forEach((card, index) => {
+        const cardId = `${card.type}-${card.category}-${index}`;
+        initialCardStates[cardId] = {
+          status: 'active',
+          expandedMain: false,
+          expandedComparison: false
+        };
+      });
+      
+      setCardStates(initialCardStates);
     } catch (error) {
       console.error('Error analyzing differences:', error);
     } finally {
@@ -49,121 +81,190 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
     }
   };
 
-  const handleSegmentToggle = (segmentId: string) => {
-    const newSelected = new Set(selectedSegments);
-    if (newSelected.has(segmentId)) {
-      newSelected.delete(segmentId);
-    } else {
-      newSelected.add(segmentId);
-    }
-    setSelectedSegments(newSelected);
+  const getCardId = (comparison: ThemeComparison, index: number) => {
+    return `${comparison.type}-${comparison.category}-${index}`;
   };
 
-  const handleMergeSelected = () => {
-    if (selectedSegments.size > 0) {
-      onMergeSegments(Array.from(selectedSegments));
-      setSelectedSegments(new Set());
-    }
+  const handleActionClick = (cardId: string, action: 'resolve' | 'merge' | 'ignore') => {
+    setConfirmAction({ cardId, action, show: true });
   };
 
-  const renderThemeComparison = (comparison: ThemeComparison, index: number) => {
-    const significanceLevel = comparison.significance > 0.7 ? 'high' : 
-                             comparison.significance > 0.4 ? 'medium' : 'low';
+  const confirmActionHandler = () => {
+    const { cardId, action } = confirmAction;
+    const status = action === 'ignore' ? 'ignored' : 'resolved';
     
+    setCardStates(prev => ({
+      ...prev,
+      [cardId]: {
+        ...prev[cardId],
+        status
+      }
+    }));
+    
+    setConfirmAction({ cardId: '', action: 'resolve', show: false });
+  };
+
+  const cancelAction = () => {
+    setConfirmAction({ cardId: '', action: 'resolve', show: false });
+  };
+
+  const toggleExpansion = (cardId: string, field: 'expandedMain' | 'expandedComparison', event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    setCardStates(prev => ({
+      ...prev,
+      [cardId]: {
+        ...prev[cardId],
+        [field]: !prev[cardId]?.[field]
+      }
+    }));
+  };
+
+  const truncateText = (text: string, maxLength: number = 100) => {
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
+  const renderComparisonCard = (comparison: ThemeComparison, index: number, isThumnail: boolean = false) => {
+    const cardId = getCardId(comparison, index);
+    const cardState = cardStates[cardId] || { status: 'active', expandedMain: false, expandedComparison: false };
+
     return (
-      <div key={index} className={`theme-comparison ${comparison.category} ${comparison.type}`}>
-        <div className="theme-header">
-          <span className={`theme-category ${comparison.category}`}>
-            {comparison.category}
-          </span>
-          <span className={`significance-badge ${significanceLevel}`} title={`Significance level: ${significanceLevel}`}>
-            {significanceLevel}
-          </span>
-        </div>
-        <h4 className="theme-description">{comparison.description}</h4>
-        
-        <div className="theme-details">
-          {comparison.mainNarrativeSpan && (
-            <div className="text-span main-span">
-              <strong>Main:</strong> "{comparison.mainNarrativeSpan}"
-            </div>
-          )}
+      <div 
+        key={cardId} 
+        className={`comparison-card ${comparison.category} ${comparison.type} ${cardState.status} ${isThumnail ? 'thumbnail' : ''}`}
+      >
+        <div className="card-header">
+          <div className="card-badges">
+            <span className={`theme-category ${comparison.category}`}>
+              {comparison.category}
+            </span>
+            {cardState.status !== 'active' && (
+              <span className={`status-badge ${cardState.status}`}>
+                {cardState.status}
+              </span>
+            )}
+          </div>
           
-          {comparison.comparisonNarrativeSpan && (
-            <div className="text-span comparison-span">
-              <strong>Comparison:</strong> "{comparison.comparisonNarrativeSpan}"
-            </div>
-          )}
-          
-          {comparison.explanation && (
-            <div className="theme-explanation-full">
-              <p>{comparison.explanation}</p>
+          {!isThumnail && cardState.status === 'active' && (
+            <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleActionClick(cardId, 'resolve');
+                }}
+                className="action-btn resolve-btn"
+                title="Manual Resolve"
+              >
+                ✓ Resolve
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleActionClick(cardId, 'merge');
+                }}
+                className="action-btn merge-btn"
+                title="Auto Merge with AI"
+              >
+                🤖 AI Merge
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleActionClick(cardId, 'ignore');
+                }}
+                className="action-btn ignore-btn"
+                title="Ignore"
+              >
+                ✕ Ignore
+              </button>
             </div>
           )}
         </div>
+
+        <h4 className="card-title">{comparison.description}</h4>
+
+        {!isThumnail && (
+          <>
+            <div className="evidence-section">
+              {comparison.mainNarrativeSpan && (
+                <div className="evidence-item main-evidence">
+                  <div className="evidence-header">
+                    <strong>Main Document Evidence:</strong>
+                    <button 
+                      onClick={(e) => toggleExpansion(cardId, 'expandedMain', e)}
+                      className="expand-btn"
+                    >
+                      {cardState.expandedMain ? '▼ Collapse' : '▶ Expand'}
+                    </button>
+                  </div>
+                  <div className="evidence-text">
+                    "{cardState.expandedMain 
+                      ? comparison.mainNarrativeSpan 
+                      : truncateText(comparison.mainNarrativeSpan)}"
+                  </div>
+                </div>
+              )}
+
+              {comparison.comparisonNarrativeSpan && (
+                <div className="evidence-item comparison-evidence">
+                  <div className="evidence-header">
+                    <strong>Comparison Document Evidence:</strong>
+                    <button 
+                      onClick={(e) => toggleExpansion(cardId, 'expandedComparison', e)}
+                      className="expand-btn"
+                    >
+                      {cardState.expandedComparison ? '▼ Collapse' : '▶ Expand'}
+                    </button>
+                  </div>
+                  <div className="evidence-text">
+                    "{cardState.expandedComparison 
+                      ? comparison.comparisonNarrativeSpan 
+                      : truncateText(comparison.comparisonNarrativeSpan)}"
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {comparison.explanation && (
+              <div className="rationale-section">
+                <h5>Analysis Rationale:</h5>
+                <p>{comparison.explanation}</p>
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   };
 
-  const renderMergeableSegments = () => {
-    if (mergeableSegments.length === 0) {
-      return <div className="no-segments">No mergeable segments found.</div>;
-    }
+  const getAllCards = () => {
+    if (!diffResult) return [];
+    return [
+      ...diffResult.holistic,
+      ...diffResult.overlapping,
+      ...diffResult.unique.mainNarrative,
+      ...diffResult.unique.comparisonNarrative,
+      ...diffResult.conflicts
+    ];
+  };
+
+  const renderHolisticSummary = () => {
+    const summaryPoints = [
+      "Your narrative shows a significant shift from external validation to internal self-worth, indicating growing emotional maturity. This change suggests you're developing a more stable sense of identity that doesn't depend on others' approval.",
+      
+      "There's an emerging pattern of increased self-compassion and acceptance of personal flaws across multiple identity dimensions. This represents healthy psychological development and suggests better emotional regulation skills.",
+      
+      "The comparison reveals stronger integration of past experiences into a coherent life story, showing improved narrative coherence. This indicates you're becoming more skilled at making meaning from your experiences and seeing connections between different life events."
+    ];
 
     return (
-      <div className="mergeable-segments">
-        <h3>Mergeable Identity Themes</h3>
-        <p className="merge-instruction">
-          Select themes from the comparison version that you'd like to integrate into your main narrative:
-        </p>
-        
-        {mergeableSegments.map((segment) => (
-          <div 
-            key={segment.id} 
-            className={`mergeable-segment ${segment.themeType} ${segment.mergeRecommendation}`}
-          >
-            <div className="segment-header">
-              <label className="segment-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedSegments.has(segment.id)}
-                  onChange={() => handleSegmentToggle(segment.id)}
-                />
-                <span className={`theme-type ${segment.themeType}`}>
-                  {segment.themeType.toUpperCase()}
-                </span>
-                <span className={`recommendation ${segment.mergeRecommendation}`}>
-                  {segment.mergeRecommendation} priority
-                </span>
-              </label>
-            </div>
-            
-            <div className="segment-preview">
-              <strong>Theme:</strong> {segment.preview}
-            </div>
-            
-            <div className="segment-explanation">
-              {segment.explanation}
-            </div>
-          </div>
-        ))}
-        
-        {selectedSegments.size > 0 && (
-          <div className="merge-actions">
-            <button 
-              onClick={handleMergeSelected}
-              className="merge-button"
-            >
-              Merge Selected Themes ({selectedSegments.size})
-            </button>
-            <button 
-              onClick={() => setSelectedSegments(new Set())}
-              className="clear-selection-button"
-            >
-              Clear Selection
-            </button>
-          </div>
-        )}
+      <div className="holistic-summary">
+        <h4>Overview Summary</h4>
+        <ul className="summary-points">
+          {summaryPoints.map((point, index) => (
+            <li key={index} className="summary-point">{point}</li>
+          ))}
+        </ul>
       </div>
     );
   };
@@ -173,13 +274,19 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
 
     switch (currentView) {
       case 'holistic':
+        const allCards = getAllCards();
         return (
-          <div className="comparison-view">
+          <div className="comparison-view holistic-view">
             <h3>Holistic Identity Analysis</h3>
-            <p className="view-description">
-              Overall identity themes and patterns comparison
-            </p>
-            {diffResult.holistic.map(renderThemeComparison)}
+            
+            {renderHolisticSummary()}
+            
+            <div className="thumbnail-section">
+              <h4>All Comparison Cards</h4>
+              <div className="thumbnail-grid">
+                {allCards.map((card, index) => renderComparisonCard(card, index, true))}
+              </div>
+            </div>
           </div>
         );
       
@@ -190,10 +297,12 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
             <p className="view-description">
               Shared identity themes between versions
             </p>
-            {diffResult.overlapping.length > 0 ? 
-              diffResult.overlapping.map(renderThemeComparison) :
-              <div className="no-themes">No overlapping themes found.</div>
-            }
+            <div className="cards-container">
+              {diffResult.overlapping.length > 0 ? 
+                diffResult.overlapping.map((card, index) => renderComparisonCard(card, index)) :
+                <div className="no-themes">No overlapping themes found.</div>
+              }
+            </div>
           </div>
         );
       
@@ -208,18 +317,22 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
             <div className="unique-sections">
               <div className="unique-main">
                 <h4>Main Version Only</h4>
-                {diffResult.unique.mainNarrative.length > 0 ? 
-                  diffResult.unique.mainNarrative.map(renderThemeComparison) :
-                  <div className="no-themes">No unique themes found.</div>
-                }
+                <div className="cards-container">
+                  {diffResult.unique.mainNarrative.length > 0 ? 
+                    diffResult.unique.mainNarrative.map((card, index) => renderComparisonCard(card, index)) :
+                    <div className="no-themes">No unique themes found.</div>
+                  }
+                </div>
               </div>
               
               <div className="unique-comparison">
                 <h4>Comparison Version Only</h4>
-                {diffResult.unique.comparisonNarrative.length > 0 ? 
-                  diffResult.unique.comparisonNarrative.map(renderThemeComparison) :
-                  <div className="no-themes">No unique themes found.</div>
-                }
+                <div className="cards-container">
+                  {diffResult.unique.comparisonNarrative.length > 0 ? 
+                    diffResult.unique.comparisonNarrative.map((card, index) => renderComparisonCard(card, index)) :
+                    <div className="no-themes">No unique themes found.</div>
+                  }
+                </div>
               </div>
             </div>
           </div>
@@ -232,72 +345,11 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
             <p className="view-description">
               Contradictory identity representations
             </p>
-            {diffResult.conflicts.length > 0 ? 
-              diffResult.conflicts.map(renderThemeComparison) :
-              <div className="no-themes">No identity conflicts detected.</div>
-            }
-          </div>
-        );
-      
-      case 'themes':
-        return (
-          <div className="comparison-view">
-            <h3>Mergeable Identity Themes</h3>
-            <p className="view-description">
-              Select themes from the comparison version to integrate into your main narrative
-            </p>
-            
-            <div className="themes-grid">
-              {mergeableSegments.length > 0 ? (
-                <>
-                  {mergeableSegments.map((segment) => (
-                    <div 
-                      key={segment.id} 
-                      className={`theme-card ${segment.themeType} ${segment.mergeRecommendation}`}
-                    >
-                      <div className="theme-card-header">
-                        <label className="theme-card-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={selectedSegments.has(segment.id)}
-                            onChange={() => handleSegmentToggle(segment.id)}
-                          />
-                          <span className={`theme-type ${segment.themeType}`}>
-                            {segment.themeType}
-                          </span>
-                          <span className={`recommendation ${segment.mergeRecommendation}`}>
-                            {segment.mergeRecommendation}
-                          </span>
-                        </label>
-                      </div>
-                      
-                      <div className="theme-card-content">
-                        <h4 className="theme-card-title">{segment.preview}</h4>
-                        <p className="theme-card-explanation">{segment.explanation}</p>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {selectedSegments.size > 0 && (
-                    <div className="themes-actions">
-                      <button 
-                        onClick={handleMergeSelected}
-                        className="merge-button"
-                      >
-                        Merge Selected Themes ({selectedSegments.size})
-                      </button>
-                      <button 
-                        onClick={() => setSelectedSegments(new Set())}
-                        className="clear-selection-button"
-                      >
-                        Clear Selection
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="no-themes">No mergeable themes found.</div>
-              )}
+            <div className="cards-container">
+              {diffResult.conflicts.length > 0 ? 
+                diffResult.conflicts.map((card, index) => renderComparisonCard(card, index)) :
+                <div className="no-themes">No identity conflicts detected.</div>
+              }
             </div>
           </div>
         );
@@ -321,7 +373,7 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
       <div className="diff-header">
         <h2>Identity-Level Narrative Comparison</h2>
         <div className="view-selector">
-          {(['holistic', 'overlapping', 'unique', 'conflicts', 'themes'] as ViewMode[]).map((mode) => (
+          {(['holistic', 'overlapping', 'unique', 'conflicts'] as ViewMode[]).map((mode) => (
             <button
               key={mode}
               onClick={() => setCurrentView(mode)}
@@ -334,16 +386,36 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
       </div>
 
       <div className="diff-content">
-        <div className="analysis-panel">
+        <div className="analysis-panel full-width">
           {renderCurrentView()}
         </div>
-        
-        {currentView === 'themes' && (
-          <div className="merge-panel">
-            {renderMergeableSegments()}
-          </div>
-        )}
       </div>
+
+      {confirmAction.show && (
+        <div className="confirmation-overlay">
+          <div className="confirmation-modal">
+            <h4>Confirm Action</h4>
+            <p>
+              Are you sure you want to {confirmAction.action === 'ignore' ? 'ignore' : 'resolve'} this theme comparison?
+              {confirmAction.action === 'merge' && ' This will use AI to automatically merge the theme.'}
+            </p>
+            <div className="confirmation-actions">
+              <button 
+                onClick={confirmActionHandler}
+                className={`confirm-btn ${confirmAction.action === 'ignore' ? 'ignore' : 'resolve'}`}
+              >
+                Yes, {confirmAction.action === 'ignore' ? 'Ignore' : 'Resolve'}
+              </button>
+              <button 
+                onClick={cancelAction}
+                className="cancel-btn"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
