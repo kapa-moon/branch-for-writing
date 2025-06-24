@@ -32,6 +32,8 @@ interface Version {
   name: string;
   timestamp: string;
   content: TiptapDocument;
+  type?: 'saved_version' | 'named_version'; // NEW: Add type field
+  createdAt?: string; // NEW: Add createdAt field
 }
 
 export default function WritingCanvasPage() {
@@ -71,26 +73,35 @@ export default function WritingCanvasPage() {
 
   const mainEditorRef = React.useRef<Editor | null>(null);
 
+  // Add new state variables after the existing ones (around line 60)
+  const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
+  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<Date | null>(null);
+  const [autoSaveIntervalId, setAutoSaveIntervalId] = useState<NodeJS.Timeout | null>(null);
+
+  // Add refs to track current values for auto-save
+  const mainDocumentContentRef = React.useRef<TiptapDocument>(mainDocumentContent);
+  const articleTitleRef = React.useRef<string>(articleTitle);
+
+  // Update refs when state changes
+  React.useEffect(() => {
+    mainDocumentContentRef.current = mainDocumentContent;
+  }, [mainDocumentContent]);
+
+  React.useEffect(() => {
+    articleTitleRef.current = articleTitle;
+  }, [articleTitle]);
+
   // Load main document from local storage on mount
   useEffect(() => {
-    const savedContentString = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedContentString) {
-      try {
-        const savedContent: TiptapDocument = JSON.parse(savedContentString);
-        setMainDocumentContent(savedContent);
-      } catch (e) {
-        console.error("Failed to parse content from local storage", e);
-        setMainDocumentContent(defaultInitialMainDocContent);
-      }
-    } else {
-      setMainDocumentContent(defaultInitialMainDocContent);
-    }
+    // This logic is now handled in loadLatestMainDocument()
+    // We'll let the database be the source of truth for the "current main document"
   }, []);
 
   // Load versions when user is authenticated (only run once when user ID is available)
   useEffect(() => {
     if (currentUser?.id) {
       fetchVersions();
+      loadLatestMainDocument();
     }
   }, [currentUser?.id]); // Only depend on user ID to prevent infinite loops
 
@@ -99,6 +110,72 @@ export default function WritingCanvasPage() {
       router.replace('/signin?message=auth_required');
     }
   }, [isPending, sessionData, router]);
+
+  const loadLatestMainDocument = async () => {
+    try {
+      console.log('Loading latest main document...');
+      const response = await fetch('/api/main-document');
+      console.log('Response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Response data:', data);
+        
+        if (data.content !== null && data.title !== null) {
+          // Load from database - this is the "current working document"
+          console.log('Loading content and title from database');
+          setMainDocumentContent(data.content);
+          setArticleTitle(data.title);
+          // Update localStorage with the loaded content
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data.content));
+        } else {
+          console.log('No main document in database, checking localStorage');
+          // No main document in database, check localStorage
+          const savedContentString = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (savedContentString) {
+            try {
+              const savedContent: TiptapDocument = JSON.parse(savedContentString);
+              setMainDocumentContent(savedContent);
+              // Keep default title since there's no saved title
+            } catch (e) {
+              console.error("Failed to parse content from local storage", e);
+              setMainDocumentContent(defaultInitialMainDocContent);
+            }
+          } else {
+            // No content anywhere, use default
+            console.log('Using default content');
+            setMainDocumentContent(defaultInitialMainDocContent);
+          }
+        }
+      } else {
+        console.error('Failed to load main document:', response.statusText);
+        // Fallback to localStorage if API fails
+        const savedContentString = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (savedContentString) {
+          try {
+            const savedContent: TiptapDocument = JSON.parse(savedContentString);
+            setMainDocumentContent(savedContent);
+          } catch (e) {
+            console.error("Failed to parse content from local storage", e);
+            setMainDocumentContent(defaultInitialMainDocContent);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading main document:', error);
+      // Fallback to localStorage if there's an error
+      const savedContentString = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedContentString) {
+        try {
+          const savedContent: TiptapDocument = JSON.parse(savedContentString);
+          setMainDocumentContent(savedContent);
+        } catch (e) {
+          console.error("Failed to parse content from local storage", e);
+          setMainDocumentContent(defaultInitialMainDocContent);
+        }
+      }
+    }
+  };
 
   const fetchVersions = async () => {
     if (isLoadingVersions) return; // Prevent multiple simultaneous calls
@@ -119,10 +196,93 @@ export default function WritingCanvasPage() {
     }
   };
 
+  // NEW: Auto-save function
+  const autoSaveDocument = async () => {
+    if (!currentUser || !mainDocumentContentRef.current || isAutoSaving) return;
+
+    setIsAutoSaving(true);
+    try {
+      const response = await fetch('/api/main-document', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: mainDocumentContentRef.current,
+          title: articleTitleRef.current,
+        }),
+      });
+
+      if (response.ok) {
+        setLastAutoSaveTime(new Date());
+        console.log('Document auto-saved successfully');
+      } else {
+        console.error('Failed to auto-save document:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error auto-saving document:', error);
+    } finally {
+      setIsAutoSaving(false);
+    }
+  };
+
+  // NEW: Setup auto-save interval (fix dependencies to avoid infinite loops)
+  useEffect(() => {
+    if (currentUser?.id) {
+      // Clear any existing interval
+      if (autoSaveIntervalId) {
+        clearInterval(autoSaveIntervalId);
+      }
+
+      // Setup new auto-save interval (10 seconds = 10000ms)
+      const intervalId = setInterval(autoSaveDocument, 10000);
+      setAutoSaveIntervalId(intervalId);
+
+      return () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
+    }
+  }, [currentUser?.id]); // Only depend on user ID to avoid recreating interval
+
   const saveVersion = async () => {
     if (!currentUser || !mainDocumentContent) return;
 
-    const versionName = prompt('Enter a name for this version:');
+    setIsSavingVersion(true);
+    try {
+      const response = await fetch('/api/main-document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: mainDocumentContent,
+          title: articleTitle,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert('Version saved! Your current work continues in a new working document.');
+        // Refresh versions to show the newly locked version
+        fetchVersions();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to save version: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving version:', error);
+      alert('Error saving version. Please try again.');
+    } finally {
+      setIsSavingVersion(false);
+    }
+  };
+
+  const createNamedVersion = async () => {
+    if (!currentUser || !mainDocumentContent) return;
+
+    const versionName = prompt('Enter a name for this version (e.g., "For Family", "For Therapist", "For Friend"):');
     if (!versionName || versionName.trim() === '') return;
 
     setIsSavingVersion(true);
@@ -141,14 +301,14 @@ export default function WritingCanvasPage() {
       if (response.ok) {
         const newVersion = await response.json();
         setVersions(prev => [newVersion, ...prev]);
-        alert('Version saved successfully!');
+        alert('Named version created successfully!');
       } else {
         const errorData = await response.json();
-        alert(`Failed to save version: ${errorData.error}`);
+        alert(`Failed to create named version: ${errorData.error}`);
       }
     } catch (error) {
-      console.error('Error saving version:', error);
-      alert('Error saving version. Please try again.');
+      console.error('Error creating named version:', error);
+      alert('Error creating named version. Please try again.');
     } finally {
       setIsSavingVersion(false);
     }
@@ -267,9 +427,50 @@ export default function WritingCanvasPage() {
     }
   };
 
-  const handleTitleSave = () => {
+  const handleTitleSave = async () => {
     setIsEditingTitle(false);
-    // Here you could save the title to backend if needed
+    
+    // Save the title to the database
+    try {
+      const response = await fetch('/api/main-document', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: articleTitle,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Title updated successfully');
+      } else if (response.status === 404) {
+        // No main document exists yet, create one
+        console.log('No main document found, creating new one with title and current content');
+        const createResponse = await fetch('/api/main-document', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: articleTitle,
+            content: mainDocumentContent,
+          }),
+        });
+        
+        if (createResponse.ok) {
+          console.log('New main document created with title');
+        } else {
+          const errorData = await createResponse.json();
+          console.error('Failed to create main document:', errorData.error);
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to update title:', errorData.error);
+      }
+    } catch (error) {
+      console.error('Error updating title:', error);
+    }
   };
 
   const handleTitleKeyPress = (e: React.KeyboardEvent) => {
@@ -316,8 +517,9 @@ export default function WritingCanvasPage() {
                 fontSize: '1.4rem',
                 fontWeight: 'normal',
                 fontFamily: 'Arial, sans-serif',
-                border: '2px solid #007bff',
-                borderRadius: '4px',
+                border: '1px solid #000',
+                borderRadius: '0',
+                outline: 'none',
                 padding: '4px 8px',
                 textAlign: 'left',
                 minWidth: '200px',
@@ -332,8 +534,9 @@ export default function WritingCanvasPage() {
                 style={{
                   fontSize: '0.8rem',
                   padding: '4px 8px',
-                  background: '#f8f9fa',
-                  border: '1px solid #dee2e6',
+                  background: '#ffffff',
+                  color: '#000',
+                  border: '1px solid #000',
                   borderRadius: '4px',
                   cursor: 'pointer'
                 }}
@@ -342,6 +545,16 @@ export default function WritingCanvasPage() {
               </button>
             </>
           )}
+          {/* NEW: Auto-save status indicator */}
+          <div style={{ fontSize: '0.75rem', color: '#666', marginLeft: '10px' }}>
+            {isAutoSaving ? (
+              <span style={{ color: '#007bff' }}>● Auto-saving...</span>
+            ) : lastAutoSaveTime ? (
+              <span>✓ Last saved: {lastAutoSaveTime.toLocaleTimeString()}</span>
+            ) : (
+              <span>○ Auto-save every 10 seconds</span>
+            )}
+          </div>
         </div>
         
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -365,8 +578,9 @@ export default function WritingCanvasPage() {
                 e.currentTarget.style.backgroundColor = '#e8f5e8';
               }
             }}
+            title="Lock this version and start a new working document"
           >
-            {isSavingVersion ? 'Saving...' : 'Save Version'}
+            {isSavingVersion ? 'Locking Version...' : 'Lock & Save Version'}
           </button>
           <button onClick={() => setAIToolOpen(!isAIToolOpen)} className="versions-button">
             {isAIToolOpen ? 'Close AI Toolbox' : 'AI Toolbox'}
@@ -403,6 +617,10 @@ export default function WritingCanvasPage() {
               <p>
                 Then click <strong>"Diff & Merge"</strong> to see changes and selectively merge content.
               </p>
+              <p>
+                <strong>🔒 Saved Versions:</strong> Locked snapshots of your work.<br/>
+                <strong>📝 Named Versions:</strong> Custom versions for specific audiences.
+              </p>
             </div>
           )}
 
@@ -414,13 +632,22 @@ export default function WritingCanvasPage() {
                 <li style={{ padding: '10px', fontStyle: 'italic' }}>No versions saved yet</li>
               ) : (
                 versions.map(version => (
-                  <li key={version.id}>
-                    <div onDoubleClick={() => handleOpenVersionForReview(version)} style={{ cursor: 'pointer' }}>
-                      <strong>{version.name}</strong> ({version.timestamp})
+                  <li key={version.id} style={{ marginBottom: '8px' }}>
+                    <div onDoubleClick={() => handleOpenVersionForReview(version)} style={{ cursor: 'pointer', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '0.8rem', marginRight: '6px' }}>
+                          {version.type === 'saved_version' ? '🔒' : '📝'}
+                        </span>
+                        <strong style={{ fontSize: '0.9rem' }}>{version.name}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                        {version.timestamp}
+                      </div>
                     </div>
                     <button 
                       onClick={() => deleteVersion(version.id)}
                       className="delete-version-button"
+                      style={{ marginTop: '4px', fontSize: '0.7rem' }}
                     >
                       Delete
                     </button>
@@ -454,7 +681,7 @@ export default function WritingCanvasPage() {
                   onClick={() => setDiffMode(!diffMode)} 
                   className={`diff-mode-button ${diffMode ? 'diff-view' : 'normal-view'}`}
                 >
-                  {diffMode ? 'Normal View' : 'Diff & Merge'}
+                  {diffMode ? 'View Document' : 'Diff & Merge'}
                 </button>
                 <button onClick={handleCloseReview} className="close-review-button">
                   Close Review

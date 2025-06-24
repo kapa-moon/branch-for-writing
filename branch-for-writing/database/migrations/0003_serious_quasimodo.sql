@@ -1,0 +1,1 @@
+ALTER TABLE "main_documents" ADD COLUMN "title" text DEFAULT 'Untitled Article' NOT NULL;

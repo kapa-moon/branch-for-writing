@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { documentVersions } from '../../../../database/schema';
-import { eq, desc } from 'drizzle-orm';
+import { documentVersions, mainDocuments } from '../../../../database/schema';
+import { eq, desc, and, or } from 'drizzle-orm';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { TiptapDocument } from '@/types/tiptap';
 
-// GET /api/versions - Get all versions for current user
+// GET /api/versions - Get all versions (both locked main documents and named versions)
 export async function GET() {
   try {
     const headersList = await headers();
@@ -18,28 +18,56 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const versions = await db
+    // Get locked main documents (saved versions)
+    const lockedMainDocs = await db
+      .select()
+      .from(mainDocuments)
+      .where(and(
+        eq(mainDocuments.userId, session.user.id),
+        eq(mainDocuments.isLocked, true)
+      ))
+      .orderBy(desc(mainDocuments.createdAt));
+
+    // Get named document versions
+    const namedVersions = await db
       .select()
       .from(documentVersions)
       .where(eq(documentVersions.userId, session.user.id))
       .orderBy(desc(documentVersions.createdAt));
 
-    // Transform to match the expected interface
-    const formattedVersions = versions.map(version => ({
-      id: version.id,
-      name: version.name,
-      timestamp: version.createdAt.toISOString().replace('T', ' ').substring(0, 16),
-      content: version.content as TiptapDocument,
-    }));
+    // Combine and format all versions
+    const allVersions = [
+      // Locked main documents (saved versions)
+      ...lockedMainDocs.map(doc => ({
+        id: doc.id,
+        name: `Saved Version: ${doc.title}`,
+        timestamp: doc.createdAt.toLocaleDateString(),
+        content: doc.content as TiptapDocument,
+        type: 'saved_version' as const,
+        createdAt: doc.createdAt.toISOString(),
+      })),
+      // Named versions
+      ...namedVersions.map(version => ({
+        id: version.id,
+        name: version.name,
+        timestamp: version.createdAt.toLocaleDateString(),
+        content: version.content as TiptapDocument,
+        type: 'named_version' as const,
+        createdAt: version.createdAt.toISOString(),
+      }))
+    ];
 
-    return NextResponse.json(formattedVersions);
+    // Sort all versions by creation date (newest first)
+    allVersions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return NextResponse.json(allVersions);
   } catch (error) {
     console.error('Error fetching versions:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// POST /api/versions - Create a new version
+// POST /api/versions - Create a named version (document_versions table)
 export async function POST(request: NextRequest) {
   try {
     const headersList = await headers();
@@ -58,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate unique ID
-    const versionId = `v${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const versionId = `version_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const newVersion = await db
       .insert(documentVersions)
@@ -70,15 +98,14 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Format for response
-    const formattedVersion = {
+    return NextResponse.json({
       id: newVersion[0].id,
       name: newVersion[0].name,
-      timestamp: newVersion[0].createdAt.toISOString().replace('T', ' ').substring(0, 16),
+      timestamp: newVersion[0].createdAt.toLocaleDateString(),
       content: newVersion[0].content as TiptapDocument,
-    };
-
-    return NextResponse.json(formattedVersion, { status: 201 });
+      type: 'named_version',
+      createdAt: newVersion[0].createdAt.toISOString(),
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating version:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

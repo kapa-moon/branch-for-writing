@@ -55,6 +55,35 @@ const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEdit
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-xl focus:outline-none p-4 border border-gray-300 rounded-md min-h-[200px]',
       },
+      handleKeyDown: (view, event) => {
+        // Handle Tab key for indentation
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          
+          const { state, dispatch } = view;
+          const { selection } = state;
+          
+          if (event.shiftKey) {
+            // Shift+Tab: Remove indentation (outdent)
+            const { from, to } = selection;
+            const textBefore = state.doc.textBetween(from - 4, from, '');
+            
+            // Check if there are spaces to remove at the beginning of the line or selection
+            if (textBefore === '    ') {
+              const tr = state.tr.delete(from - 4, from);
+              dispatch(tr);
+              return true;
+            }
+          } else {
+            // Tab: Add indentation (4 spaces)
+            const tr = state.tr.insertText('    ', selection.from, selection.to);
+            dispatch(tr);
+            return true;
+          }
+        }
+        
+        return false;
+      },
     },
   });
 
@@ -64,6 +93,19 @@ const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEdit
       editorRef.current = editor;
     }
   }, [editor, editorRef]);
+
+  // Update editor content when initialContent prop changes
+  useEffect(() => {
+    if (editor && initialContent) {
+      // Get current content to compare
+      const currentContent = editor.getJSON();
+      
+      // Only update if the content is actually different to avoid unnecessary updates
+      if (JSON.stringify(currentContent) !== JSON.stringify(initialContent)) {
+        editor.commands.setContent(initialContent, false); // false prevents triggering onUpdate
+      }
+    }
+  }, [editor, initialContent]);
 
   return (
     <div className="tiptap-editor-wrapper">
@@ -119,6 +161,27 @@ const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEdit
             title="Clear Highlight"
           >
             Clear
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={editor.isActive('heading', { level: 1 }) ? 'active' : ''}
+            title="Heading 1"
+          >
+            H1
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={editor.isActive('heading', { level: 2 }) ? 'active' : ''}
+            title="Heading 2"
+          >
+            H2
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={editor.isActive('bulletList') ? 'active' : ''}
+            title="Bullet List"
+          >
+            • List
           </button>
         </div>
       )}
