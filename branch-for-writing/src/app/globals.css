@@ -139,3 +139,16 @@ body {
   pointer-events: none;
   height: 0;
 }
+
+/* TiptapEditor line-height adjustments */
+.prose, .prose-sm, .prose-lg, .prose-xl {
+  line-height: 1.8 !important;
+}
+
+.prose p, .prose-sm p, .prose-lg p, .prose-xl p {
+  line-height: 1.8 !important;
+}
+
+.prose div, .prose-sm div, .prose-lg div, .prose-xl div {
+  line-height: 1.8 !important;
+}

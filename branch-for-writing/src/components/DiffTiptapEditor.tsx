@@ -114,6 +114,9 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
     setCardStates(prev => ({
       ...prev,
       [cardId]: {
+        status: 'active',
+        expandedMain: false,
+        expandedComparison: false,
         ...prev[cardId],
         [field]: !prev[cardId]?.[field]
       }

@@ -416,9 +416,9 @@
 }
 
 .merge-button {
-  background: #10b981;
-  color: white;
-  border: none;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
   padding: 8px 16px;
   border-radius: 6px;
   font-weight: 500;
@@ -427,13 +427,13 @@
 }
 
 .merge-button:hover {
-  background: #059669;
+  background: #e9e9e9;
 }
 
 .clear-selection-button {
-  background: #6b7280;
-  color: white;
-  border: none;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
   padding: 8px 16px;
   border-radius: 6px;
   font-weight: 500;
@@ -442,7 +442,7 @@
 }
 
 .clear-selection-button:hover {
-  background: #4b5563;
+  background: #e9e9e9;
 }
 
 /* === SUMMARY SECTIONS === */
@@ -768,11 +768,17 @@
 .action-btn {
   font-size: 0.75rem;
   padding: 4px 8px;
-  border: none;
+  border: 1px solid #000;
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s ease;
+  background: #fff;
+  color: #000;
+}
+
+.action-btn:hover {
+  background: #e9e9e9;
 }
 
 .resolve-btn {
@@ -834,15 +840,17 @@
 
 .expand-btn {
   font-size: 0.75rem;
-  background: none;
-  border: none;
-  color: #6b7280;
+  background: #fff;
+  border: 1px solid #000;
+  color: #000;
   cursor: pointer;
   padding: 2px 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
 
 .expand-btn:hover {
-  color: #374151;
+  background: #e9e9e9;
 }
 
 .evidence-text {
@@ -928,11 +936,17 @@
 
 .confirm-btn {
   padding: 8px 16px;
-  border: none;
+  border: 1px solid #000;
   border-radius: 6px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  background: #fff;
+  color: #000;
+}
+
+.confirm-btn:hover {
+  background: #e9e9e9;
 }
 
 .confirm-btn.resolve {
@@ -955,17 +969,17 @@
 
 .cancel-btn {
   padding: 8px 16px;
-  border: 1px solid #d1d5db;
-  background: white;
+  border: 1px solid #000;
+  background: #fff;
   border-radius: 6px;
   font-weight: 500;
   cursor: pointer;
-  color: #374151;
+  color: #000;
   transition: all 0.2s ease;
 }
 
 .cancel-btn:hover {
-  background: #f9fafb;
+  background: #e9e9e9;
 }
 
 /* === HOLISTIC VIEW STYLES === */

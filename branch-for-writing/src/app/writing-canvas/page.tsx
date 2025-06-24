@@ -220,7 +220,7 @@ export default function WritingCanvasPage() {
     return (
       <main style={{ textAlign: 'center', padding: '50px' }}>
         <p>Error loading session: {error.message}. Please try signing in again.</p>
-        <button onClick={() => router.push('/signin')} style={{ marginTop: '20px', padding: '10px 15px' }}>Go to Sign In</button>
+        <button onClick={() => router.push('/signin')} className="versions-button">Go to Sign In</button>
       </main>
     );
   }
@@ -300,16 +300,7 @@ export default function WritingCanvasPage() {
                     </div>
                     <button 
                       onClick={() => deleteVersion(version.id)}
-                      style={{
-                        marginTop: '5px',
-                        padding: '2px 8px',
-                        fontSize: '12px',
-                        backgroundColor: '#ff4444',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '3px',
-                        cursor: 'pointer'
-                      }}
+                      className="delete-version-button"
                     >
                       Delete
                     </button>
