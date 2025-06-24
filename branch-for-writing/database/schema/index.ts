@@ -24,6 +24,7 @@ export const documentVersions = pgTable('document_versions', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   content: jsonb('content').notNull(), // Store TiptapDocument as JSONB
+  supporter: text('supporter'), // NEW: Supporter field that can be NULL
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
   updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),

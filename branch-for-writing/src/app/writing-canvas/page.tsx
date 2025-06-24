@@ -580,7 +580,7 @@ export default function WritingCanvasPage() {
             }}
             title="Lock this version and start a new working document"
           >
-            {isSavingVersion ? 'Locking Version...' : 'Lock & Save Version'}
+            {isSavingVersion ? 'Locking Version...' : 'Save Main Document'}
           </button>
           <button onClick={() => setAIToolOpen(!isAIToolOpen)} className="versions-button">
             {isAIToolOpen ? 'Close AI Toolbox' : 'AI Toolbox'}
