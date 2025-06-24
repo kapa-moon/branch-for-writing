@@ -5,8 +5,11 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
+// @ts-ignore - type declarations may be missing but runtime is available
+import Underline from '@tiptap/extension-underline';
 import { Editor } from '@tiptap/core';
 import { TiptapDocument } from '@/types/tiptap';
+import './tiptap-editor.css';
 
 interface TiptapEditorProps {
   initialContent: TiptapDocument | null;
@@ -26,6 +29,7 @@ const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEdit
       Placeholder.configure({
         placeholder: isEditable ? 'please start writing here' : 'Reviewing version...',
       }),
+      Underline,
     ],
     content: initialContent,
     editable: isEditable,
@@ -62,7 +66,66 @@ const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEdit
   }, [editor, editorRef]);
 
   return (
-    <EditorContent editor={editor} />
+    <div className="tiptap-editor-wrapper">
+      {isEditable && editor && (
+        <div className="editor-menu-bar">
+          <button
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            className={editor.isActive('bold') ? 'active' : ''}
+            title="Bold"
+          >
+            <strong>B</strong>
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className={editor.isActive('italic') ? 'active' : ''}
+            title="Italic"
+          >
+            <em>I</em>
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            className={editor.isActive('strike') ? 'active' : ''}
+            title="Strike"
+          >
+            <span style={{ textDecoration: 'line-through' }}>S</span>
+          </button>
+          <button
+            // @ts-ignore - toggleUnderline provided by Underline extension
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            className={editor.isActive('underline') ? 'active' : ''}
+            title="Underline"
+          >
+            <span style={{ textDecoration: 'underline' }}>U</span>
+          </button>
+          <button
+            onClick={() => editor.chain().focus().setHighlight({ color: '#ffffcc' }).run()}
+            title="Highlight Yellow"
+            className={editor.isActive('highlight', { color: '#ffffcc' }) ? 'active' : ''}
+            style={{ backgroundColor: '#ffffcc' }}
+          >
+            Y
+          </button>
+          <button
+            onClick={() => editor.chain().focus().setHighlight({ color: '#ffe6ff' }).run()}
+            title="Highlight Pink"
+            className={editor.isActive('highlight', { color: '#ffe6ff' }) ? 'active' : ''}
+            style={{ backgroundColor: '#ffe6ff' }}
+          >
+            P
+          </button>
+          <button
+            onClick={() => editor.chain().focus().unsetHighlight().run()}
+            title="Clear Highlight"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+      <div className="editor-content-wrapper">
+        <EditorContent editor={editor} />
+      </div>
+    </div>
   );
 };
 

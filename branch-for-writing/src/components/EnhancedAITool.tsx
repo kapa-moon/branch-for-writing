@@ -47,7 +47,8 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
   selectedText,
   onRequestTextSelection
 }) => {
-  const [activeTab, setActiveTab] = useState<'analysis' | 'reconciliation' | 'chat'>('analysis');
+  // Default to 'reconciliation'; 'analysis' tab option hidden for now
+  const [activeTab, setActiveTab] = useState<'analysis' | 'reconciliation' | 'chat'>('reconciliation');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   // Identity Analysis State
@@ -263,12 +264,14 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
       <div className="enhanced-ai-header">
         <h3>🧰 AI Toolbox</h3>
         <div className="tab-selector">
+          {/* Analysis tab temporarily hidden
           <button 
             onClick={() => setActiveTab('analysis')}
             className={`tab-button ${activeTab === 'analysis' ? 'active' : ''}`}
           >
             Analysis
           </button>
+          */}
           <button 
             onClick={() => setActiveTab('reconciliation')}
             className={`tab-button ${activeTab === 'reconciliation' ? 'active' : ''}`}
