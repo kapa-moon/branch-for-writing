@@ -415,13 +415,13 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
     <div className="diff-editor-container">
       <div className="diff-header">
         <div className="view-selector">
-          {(['holistic', 'overlapping', 'unique', 'conflicts'] as ViewMode[]).map((mode) => (
+          {(['holistic', 'unique', 'conflicts', 'overlapping'] as ViewMode[]).map((mode) => (
             <button
               key={mode}
               onClick={() => setCurrentView(mode)}
               className={`view-button ${currentView === mode ? 'active' : ''}`}
             >
-              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              {mode === 'holistic' ? 'Overview' : mode.charAt(0).toUpperCase() + mode.slice(1)}
             </button>
           ))}
         </div>
