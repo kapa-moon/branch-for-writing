@@ -10,6 +10,8 @@ import './writing-canvas.css';
 import { TiptapDocument } from '@/types/tiptap';
 import AITool from '@/components/AITool';
 import { DocumentDiffEngine } from '@/lib/diffEngine';
+// @ts-ignore - type provided by @tiptap/core at runtime, suppress if linter cannot resolve
+import { Editor } from '@tiptap/core';
 
 const LOCAL_STORAGE_KEY = 'tiptap-main-document';
 
@@ -62,6 +64,8 @@ export default function WritingCanvasPage() {
 
   // NEW: Add state for toggleable info card
   const [showVersionsInfo, setShowVersionsInfo] = useState<boolean>(false);
+
+  const mainEditorRef = React.useRef<Editor | null>(null);
 
   // Load main document from local storage on mount
   useEffect(() => {
@@ -212,6 +216,53 @@ export default function WritingCanvasPage() {
     setSelectedText(text);
   };
 
+  // Helper: find range of the first occurrence of text in the document
+  const findTextRange = (editor: Editor, searchText: string): { from: number; to: number } | null => {
+    const lowerSearch = searchText.toLowerCase();
+    let foundFrom: number | null = null;
+    let foundTo: number | null = null;
+
+    // Using `any` for node to avoid deep ProseMirror typings here
+    editor.state.doc.descendants((node: any, pos: number) => {
+      if (foundFrom !== null) return false; // stop
+      if (node.isText) {
+        const text = (node.text || '').toLowerCase();
+        const index = text.indexOf(lowerSearch);
+        if (index !== -1) {
+          foundFrom = pos + index;
+          foundTo = (foundFrom as number) + searchText.length;
+          return false;
+        }
+      }
+      return true;
+    });
+
+    return foundFrom !== null && foundTo !== null ? { from: foundFrom as number, to: foundTo as number } : null;
+  };
+
+  const highlightTextInMainEditor = (text: string) => {
+    const editor = mainEditorRef.current;
+    if (!editor) return;
+
+    // Remove existing highlight (optional):
+    // editor.commands.selectAll();
+    // editor.commands.unsetHighlight();
+
+    const range = findTextRange(editor, text);
+    if (range) {
+      // @ts-ignore - highlight commands may not be typed in Editor chain helpers
+      editor
+        .chain()
+        .focus()
+        .setTextSelection(range)
+        .setHighlight({ color: '#DCEEFB' })
+        .scrollIntoView()
+        .run();
+    } else {
+      alert('Unable to locate the specified text in the document.');
+    }
+  };
+
   if (isPending) {
     return <main style={{ textAlign: 'center', padding: '50px' }}><p>Loading Writing Canvas...</p></main>;
   }
@@ -319,6 +370,7 @@ export default function WritingCanvasPage() {
             onContentChange={handleMainContentChange}
             onTextSelection={handleTextSelection}
             isEditable={true}
+            editorRef={mainEditorRef}
           />
         </div>
         {/* UPDATED: Enhanced review editor with diff functionality */}
@@ -345,6 +397,7 @@ export default function WritingCanvasPage() {
                 originalContent={mainDocumentContent}
                 comparisonContent={selectedReviewVersion.content}
                 onMergeSegments={handleMergeSegments}
+                onHighlightText={highlightTextInMainEditor}
               />
             ) : (
               <TiptapEditor 

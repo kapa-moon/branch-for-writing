@@ -14,6 +14,7 @@ interface DiffTiptapEditorProps {
   originalContent: TiptapDocument;
   comparisonContent: TiptapDocument;
   onMergeSegments: (selectedSegmentIds: string[]) => void;
+  onHighlightText?: (text: string) => void;
 }
 
 type ViewMode = 'holistic' | 'overlapping' | 'unique' | 'conflicts';
@@ -31,7 +32,8 @@ interface CardState {
 const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({ 
   originalContent, 
   comparisonContent, 
-  onMergeSegments 
+  onMergeSegments,
+  onHighlightText 
 }) => {
   const [diffResult, setDiffResult] = useState<IdentityDiffResult | null>(null);
   const [currentView, setCurrentView] = useState<ViewMode>('holistic');
@@ -240,6 +242,21 @@ const DiffTiptapEditor: React.FC<DiffTiptapEditorProps> = ({
                     >
                       {cardState.expandedMain ? '▼ Collapse' : '▶ Expand'}
                     </button>
+                    {onHighlightText && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (comparison.mainNarrativeSpan) {
+                            onHighlightText(comparison.mainNarrativeSpan);
+                          }
+                        }}
+                        className="highlight-btn"
+                        title="Highlight in text"
+                        style={{ marginLeft: '6px' }}
+                      >
+                        🔍 Highlight in text
+                      </button>
+                    )}
                   </div>
                   <div className="evidence-text">
                     "{cardState.expandedMain 

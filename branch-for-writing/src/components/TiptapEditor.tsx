@@ -1,9 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import Highlight from '@tiptap/extension-highlight';
+import { Editor } from '@tiptap/core';
 import { TiptapDocument } from '@/types/tiptap';
 
 interface TiptapEditorProps {
@@ -11,12 +13,16 @@ interface TiptapEditorProps {
   onContentChange: (content: TiptapDocument) => void;
   onTextSelection?: (selectedText: string) => void;
   isEditable?: boolean;
+  editorRef?: React.MutableRefObject<Editor | null>;
 }
 
-const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEditable = true }: TiptapEditorProps) => {
+const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEditable = true, editorRef }: TiptapEditorProps) => {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Highlight.configure({
+        multicolor: true,
+      }),
       Placeholder.configure({
         placeholder: isEditable ? 'please start writing here' : 'Reviewing version...',
       }),
@@ -47,6 +53,13 @@ const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEdit
       },
     },
   });
+
+  // Expose editor instance to parent via ref
+  useEffect(() => {
+    if (editorRef) {
+      editorRef.current = editor;
+    }
+  }, [editor, editorRef]);
 
   return (
     <EditorContent editor={editor} />

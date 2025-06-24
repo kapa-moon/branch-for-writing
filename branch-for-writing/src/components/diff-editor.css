@@ -1261,4 +1261,20 @@
 .holistic-view .comparison-card.unique,
 .holistic-view .comparison-card.conflict {
   border-left: 1px solid #e5e7eb !important;
+}
+
+/* Highlight Button (same style as expand) */
+.highlight-btn {
+  font-size: 0.75rem;
+  background: #fff;
+  border: 1px solid #000;
+  color: #000;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.highlight-btn:hover {
+  background: #e9e9e9;
 } 

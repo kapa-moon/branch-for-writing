@@ -630,7 +630,7 @@ class NarrativeAnalyzer {
         valence: 'negative',
         intensity: 0.6,
         description: 'Contamination sequence showing setback',
-        textSpan: 'lost... disappointed',
+        textSpan: 'pivotal starting point for understanding who I am. Growing up in a multicultural household, I witnessed',
         confidence: 0.7
       });
     }
