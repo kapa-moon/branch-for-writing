@@ -65,6 +65,10 @@ export default function WritingCanvasPage() {
   // NEW: Add state for toggleable info card
   const [showVersionsInfo, setShowVersionsInfo] = useState<boolean>(false);
 
+  // Article title state
+  const [articleTitle, setArticleTitle] = useState<string>('Untitled Article');
+  const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
+
   const mainEditorRef = React.useRef<Editor | null>(null);
 
   // Load main document from local storage on mount
@@ -263,6 +267,20 @@ export default function WritingCanvasPage() {
     }
   };
 
+  const handleTitleSave = () => {
+    setIsEditingTitle(false);
+    // Here you could save the title to backend if needed
+  };
+
+  const handleTitleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleSave();
+    }
+    if (e.key === 'Escape') {
+      setIsEditingTitle(false);
+    }
+  };
+
   if (isPending) {
     return <main style={{ textAlign: 'center', padding: '50px' }}><p>Loading Writing Canvas...</p></main>;
   }
@@ -284,17 +302,68 @@ export default function WritingCanvasPage() {
 
   return (
     <main style={{ padding: '20px' }} className={`writing-canvas-page ${isReviewing ? 'is-reviewing' : ''} ${isSideMenuOpen ? 'side-menu-open' : ''}`}>
-      <div className="canvas-header">
-        <h1 className='writing-canvas-title'>Writing Canvas</h1>
+      <div className="canvas-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div className="title-editor-section" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {isEditingTitle ? (
+            <input
+              type="text"
+              value={articleTitle}
+              onChange={(e) => setArticleTitle(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyPress}
+              autoFocus
+              style={{
+                fontSize: '1.4rem',
+                fontWeight: 'normal',
+                fontFamily: 'Arial, sans-serif',
+                border: '2px solid #007bff',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                textAlign: 'left',
+                minWidth: '200px',
+                maxWidth: '400px'
+              }}
+            />
+          ) : (
+            <>
+              <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 'normal', fontFamily: 'Arial, sans-serif' }}>{articleTitle}</h1>
+              <button
+                onClick={() => setIsEditingTitle(true)}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '4px 8px',
+                  background: '#f8f9fa',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Edit Title
+              </button>
+            </>
+          )}
+        </div>
+        
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
             onClick={saveVersion} 
             disabled={isSavingVersion}
-            className="versions-button"
+            className="versions-button save-version-btn"
             style={{ 
-              backgroundColor: isSavingVersion ? '#ccc' : '#4CAF50',
-              color: 'white',
+              backgroundColor: isSavingVersion ? '#ccc' : '#e8f5e8',
+              color: isSavingVersion ? '#666' : '#000',
+              border: '1px solid #000',
               cursor: isSavingVersion ? 'not-allowed' : 'pointer'
+            }}
+            onMouseOver={(e) => {
+              if (!isSavingVersion) {
+                e.currentTarget.style.backgroundColor = '#d4e6d4';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (!isSavingVersion) {
+                e.currentTarget.style.backgroundColor = '#e8f5e8';
+              }
             }}
           >
             {isSavingVersion ? 'Saving...' : 'Save Version'}
