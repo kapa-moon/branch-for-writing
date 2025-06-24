@@ -261,7 +261,7 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
   return (
     <div className="ai-tool-wrapper enhanced">
       <div className="enhanced-ai-header">
-        <h3>AI Identity Analysis</h3>
+        <h3>🧰 AI Toolbox</h3>
         <div className="tab-selector">
           <button 
             onClick={() => setActiveTab('analysis')}
