@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { TiptapDocument } from '@/types/tiptap';
-import { DocumentDiffEngine } from '@/lib/diffEngine';
+import { IdentityDiffEngine, IdentityDiffResult, ThemeComparison } from '@/lib/diffEngine';
 import './ai-tool.css';
 
 interface EnhancedAIToolProps {
@@ -17,16 +17,28 @@ interface ContextItem {
 }
 
 interface IdentityFacet {
-  facet: string;
-  mainVersion: string;
-  comparisonVersion: string;
-  evidence: string[];
+  category: 'affective' | 'motivational' | 'integrative' | 'structural';
+  description: string;
+  mainScore: number;
+  comparisonScore?: number;
+  analysis: string;
+  suggestions: string[];
 }
 
 interface ReconciliationSuggestion {
-  type: 'addition' | 'filtering' | 'awareness';
-  suggestion: string;
-  reasoning: string;
+  type: 'addition' | 'filtering' | 'reconciliation' | 'awareness';
+  priority: 'high' | 'medium' | 'low';
+  description: string;
+  explanation: string;
+  actionable: string;
+}
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  context?: string;
 }
 
 const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({ 
@@ -46,306 +58,390 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
   
   // Chat State
   const [currentContext, setCurrentContext] = useState<string>('');
-  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
-  const [currentMessage, setCurrentMessage] = useState('');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [currentMessage, setCurrentMessage] = useState<string>('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
-  // CLEANED UP: Manual add without excessive feedback
-  const addToContext = useCallback(() => {
-    if (!selectedText || selectedText.trim().length <= 3) {
-      alert('Please select text in the main editor first.');
+  // Auto-add selected text to context
+  useEffect(() => {
+    if (selectedText && selectedText.trim().length > 3) {
+      setCurrentContext(selectedText.trim());
+    }
+  }, [selectedText]);
+
+  const runIdentityAnalysis = async () => {
+    if (!comparisonContent) {
+      alert('Please select a version to compare for identity analysis.');
       return;
     }
 
-    const textToAdd = selectedText.trim();
-    
-    // Check if this is the same text as already in context
-    if (currentContext === textToAdd) {
-      return; // Silently ignore if same text
+    setIsAnalyzing(true);
+    try {
+      const diffEngine = new IdentityDiffEngine();
+      const diffResult = await diffEngine.generateIdentityDiff(mainContent, comparisonContent);
+      
+      // Transform diff result into identity facets
+      const facets = transformDiffToIdentityFacets(diffResult);
+      setIdentityAnalysis(facets);
+      
+    } catch (error) {
+      console.error('Error in identity analysis:', error);
+      alert('Error analyzing identity themes. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const generateReconciliationSuggestions = async () => {
+    if (!comparisonContent) {
+      alert('Please select a version to compare for reconciliation analysis.');
+      return;
     }
 
-    // Add to context
-    setCurrentContext(textToAdd);
-  }, [selectedText, currentContext]);
+    setIsAnalyzing(true);
+    try {
+      // TODO: Replace with actual LLM call
+      // For now, using sophisticated dummy suggestions
+      const suggestions = await generateDummyReconciliationSuggestions();
+      setReconciliationSuggestions(suggestions);
+      
+    } catch (error) {
+      console.error('Error generating reconciliation suggestions:', error);
+      alert('Error generating suggestions. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
-  // Clear context
+  const sendChatMessage = async () => {
+    if (!currentMessage.trim()) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: currentMessage,
+      timestamp: new Date(),
+      context: currentContext || undefined
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setCurrentMessage('');
+    setIsChatLoading(true);
+
+    try {
+      // TODO: Replace with actual OpenAI API call
+      const response = await generateDummyChatResponse(currentMessage, currentContext, mainContent);
+      
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: response,
+        timestamp: new Date()
+      };
+
+      setChatMessages(prev => [...prev, assistantMessage]);
+      
+      // Clear context after sending
+      setCurrentContext('');
+      
+    } catch (error) {
+      console.error('Error in chat:', error);
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   const clearContext = () => {
     setCurrentContext('');
   };
 
-  // Identity Diff Analysis
-  const analyzeIdentityDifferences = useCallback(async () => {
-    if (!comparisonContent) {
-      alert('Please select a version to compare first.');
-      return;
-    }
-    
-    setIsAnalyzing(true);
-    try {
-      const response = await fetch('/api/ai/identity-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mainContent,
-          comparisonContent
-        })
-      });
-      
-      const result = await response.json();
-      setIdentityAnalysis(result.identityFacets || []);
-    } catch (error) {
-      console.error('Identity analysis failed:', error);
-      alert('Analysis failed. Please try again.');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [mainContent, comparisonContent]);
+  // Helper functions for dummy data (TODO: Replace with actual LLM calls)
+  const transformDiffToIdentityFacets = (diffResult: IdentityDiffResult): IdentityFacet[] => {
+    const facets: IdentityFacet[] = [];
 
-  // Reconciliation Analysis
-  const generateReconciliation = useCallback(async () => {
-    if (identityAnalysis.length === 0) {
-      alert('Please run Identity Analysis first.');
-      return;
-    }
-    
-    setIsAnalyzing(true);
-    try {
-      const response = await fetch('/api/ai/reconciliation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identityDifferences: identityAnalysis,
-          mainContent,
-          comparisonContent
-        })
+    // Analyze affective themes
+    const affectiveComparisons = diffResult.holistic.filter(c => c.category === 'affective');
+    if (affectiveComparisons.length > 0) {
+      facets.push({
+        category: 'affective',
+        description: 'Emotional tone and affective patterns',
+        mainScore: 0.7,
+        comparisonScore: 0.8,
+        analysis: affectiveComparisons[0]?.explanation || 'Emotional narrative patterns analyzed',
+        suggestions: [
+          'Consider integrating more redemptive sequences',
+          'Balance negative and positive emotional content',
+          'Strengthen emotional resilience themes'
+        ]
       });
-      
-      const result = await response.json();
-      setReconciliationSuggestions(result.suggestions || []);
-    } catch (error) {
-      console.error('Reconciliation analysis failed:', error);
-      alert('Reconciliation analysis failed. Please try again.');
-    } finally {
-      setIsAnalyzing(false);
     }
-  }, [identityAnalysis, mainContent, comparisonContent]);
 
-  // FIXED: Chat with context and clear after sending
-  const sendChatMessage = useCallback(async () => {
-    if (!currentMessage.trim()) return;
-    
-    const userMessage = currentMessage.trim();
-    const contextForThisMessage = currentContext; // Capture current context
-    
-    // Clear inputs immediately
-    setCurrentMessage('');
-    setCurrentContext(''); // FIXED: Clear context after sending
-    
-    // Add user message to history
-    setChatHistory(prev => [...prev, { role: 'user', content: userMessage }]);
-    
-    setIsAnalyzing(true);
-    try {
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          mainContent,
-          comparisonContent,
-          selectedContext: contextForThisMessage, // Send the context that was selected
-          chatHistory
-        })
+    // Analyze motivational themes
+    const motivationalComparisons = diffResult.holistic.filter(c => c.category === 'motivational');
+    if (motivationalComparisons.length > 0) {
+      facets.push({
+        category: 'motivational',
+        description: 'Agency and communion themes',
+        mainScore: 0.6,
+        comparisonScore: 0.75,
+        analysis: motivationalComparisons[0]?.explanation || 'Agency/communion balance analyzed',
+        suggestions: [
+          'Enhance agency themes around personal control',
+          'Integrate more communion-oriented experiences',
+          'Balance individual achievement with relational themes'
+        ]
       });
-      
-      const result = await response.json();
-      setChatHistory(prev => [...prev, { role: 'assistant', content: result.response }]);
-    } catch (error) {
-      console.error('Chat failed:', error);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
-    } finally {
-      setIsAnalyzing(false);
     }
-  }, [currentMessage, currentContext, mainContent, comparisonContent, chatHistory]);
+
+    return facets;
+  };
+
+  const generateDummyReconciliationSuggestions = async (): Promise<ReconciliationSuggestion[]> => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    return [
+      {
+        type: 'reconciliation',
+        priority: 'high',
+        description: 'Integrate conflicting identity representations',
+        explanation: 'Your narratives show tension between achievement-focused and relationship-focused identity. This is common in emerging adulthood.',
+        actionable: 'Create a "bridge narrative" that shows how both aspects can coexist in your identity.'
+      },
+      {
+        type: 'addition',
+        priority: 'medium',
+        description: 'Reveal more vulnerable aspects',
+        explanation: 'Your comparison version shows increased openness about struggles and growth.',
+        actionable: 'Consider incorporating 1-2 specific examples of overcoming challenges from your comparison version.'
+      },
+      {
+        type: 'filtering',
+        priority: 'medium',
+        description: 'Adjust narrative for different audiences',
+        explanation: 'Different supporters may need different levels of detail about personal struggles.',
+        actionable: 'Create audience-specific versions: detailed for therapeutic contexts, moderate for mentors.'
+      },
+      {
+        type: 'awareness',
+        priority: 'low',
+        description: 'Recognize multiple identity facets',
+        explanation: 'Your analysis shows you have rich, multifaceted identity representation.',
+        actionable: 'Reflect on how different aspects of yourself emerge in different contexts.'
+      }
+    ];
+  };
+
+  const generateDummyChatResponse = async (message: string, context: string, content: TiptapDocument): Promise<string> => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (context) {
+      return `Based on the selected text "${context.substring(0, 50)}...", I can see this relates to identity themes around personal growth and self-reflection. This passage shows elements of both agency (taking control) and meaning-making (learning from experience). Would you like me to suggest how this might connect to other parts of your narrative?`;
+    }
+    
+    if (message.toLowerCase().includes('identity')) {
+      return `Your narrative shows strong identity development patterns. I notice themes of growth, self-reflection, and evolving relationships. The comparison between your versions suggests you're developing a more integrated sense of self. What specific aspect of your identity development would you like to explore further?`;
+    }
+    
+    if (message.toLowerCase().includes('theme')) {
+      return `The main themes I see in your writing include personal agency, meaningful relationships, overcoming challenges, and self-discovery. These are common in emerging adult narratives. Which theme resonates most strongly with your current life experience?`;
+    }
+    
+    return `I'm analyzing your narrative for identity themes, emotional patterns, and personal growth indicators. Feel free to select specific text from your writing and ask me about identity patterns, themes, or how different versions compare. What would you like to explore?`;
+  };
 
   return (
     <div className="ai-tool-wrapper enhanced">
-      {/* Tab Navigation */}
-      <div className="ai-tabs">
-        <button 
-          className={`ai-tab ${activeTab === 'analysis' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analysis')}
-        >
-          Identity Analysis
-        </button>
-        <button 
-          className={`ai-tab ${activeTab === 'reconciliation' ? 'active' : ''}`}
-          onClick={() => setActiveTab('reconciliation')}
-        >
-          Reconciliation
-        </button>
-        <button 
-          className={`ai-tab ${activeTab === 'chat' ? 'active' : ''}`}
-          onClick={() => setActiveTab('chat')}
-        >
-          AI Chat
-        </button>
+      <div className="enhanced-ai-header">
+        <h3>AI Identity Analysis</h3>
+        <div className="tab-selector">
+          <button 
+            onClick={() => setActiveTab('analysis')}
+            className={`tab-button ${activeTab === 'analysis' ? 'active' : ''}`}
+          >
+            Analysis
+          </button>
+          <button 
+            onClick={() => setActiveTab('reconciliation')}
+            className={`tab-button ${activeTab === 'reconciliation' ? 'active' : ''}`}
+          >
+            Reconciliation
+          </button>
+          <button 
+            onClick={() => setActiveTab('chat')}
+            className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
+          >
+            Chat
+          </button>
+        </div>
       </div>
 
-      {/* Identity Analysis Tab */}
-      {activeTab === 'analysis' && (
-        <div className="ai-tab-content">
-          <div className="ai-section">
-            <h3>Identity Difference Analysis</h3>
-            <p className="ai-description">
-              Analyzes how you present different aspects of your identity across versions.
+      <div className="enhanced-ai-content">
+        {activeTab === 'analysis' && (
+          <div className="analysis-tab">
+            <div className="tab-header">
+              <h4>Identity Diff Analysis</h4>
+              <button 
+                onClick={runIdentityAnalysis}
+                disabled={isAnalyzing || !comparisonContent}
+                className="run-analysis-button"
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+              </button>
+            </div>
+            
+            <p className="tab-description">
+              Analyzes affective, motivational, integrative, and structural differences between narrative versions.
             </p>
-            
-            <button 
-              onClick={analyzeIdentityDifferences}
-              disabled={!comparisonContent || isAnalyzing}
-              className="ai-button primary"
-            >
-              {isAnalyzing ? 'Analyzing Identity Themes...' : 'Analyze Identity Differences'}
-            </button>
-            
-            {identityAnalysis.length > 0 && (
-              <div className="analysis-results">
-                <h4>Identity Facets Found:</h4>
+
+            {identityAnalysis.length > 0 ? (
+              <div className="identity-facets">
                 {identityAnalysis.map((facet, index) => (
-                  <div key={index} className="identity-facet">
-                    <h5>{facet.facet}</h5>
-                    <div className="facet-comparison">
-                      <div className="version main-version">
-                        <strong>Current Version:</strong> {facet.mainVersion}
-                      </div>
-                      <div className="version comparison-version">
-                        <strong>Saved Version:</strong> {facet.comparisonVersion}
+                  <div key={index} className={`identity-facet ${facet.category}`}>
+                    <div className="facet-header">
+                      <h5>{facet.category.toUpperCase()}</h5>
+                      <div className="facet-scores">
+                        <span>Main: {(facet.mainScore * 100).toFixed(0)}%</span>
+                        {facet.comparisonScore && (
+                          <span>Comp: {(facet.comparisonScore * 100).toFixed(0)}%</span>
+                        )}
                       </div>
                     </div>
-                    {facet.evidence.length > 0 && (
-                      <div className="evidence">
-                        <strong>Evidence:</strong>
-                        <ul>
-                          {facet.evidence.map((evidence, i) => (
-                            <li key={i}>{evidence}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    <p className="facet-description">{facet.description}</p>
+                    <p className="facet-analysis">{facet.analysis}</p>
+                    <div className="facet-suggestions">
+                      <strong>Suggestions:</strong>
+                      <ul>
+                        {facet.suggestions.map((suggestion, idx) => (
+                          <li key={idx}>{suggestion}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 ))}
               </div>
+            ) : (
+              <div className="no-analysis">
+                {comparisonContent ? 
+                  'Click "Run Analysis" to compare identity themes between versions.' :
+                  'Select a version to compare first.'
+                }
+              </div>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Reconciliation Tab */}
-      {activeTab === 'reconciliation' && (
-        <div className="ai-tab-content">
-          <div className="ai-section">
-            <h3>Identity Reconciliation</h3>
-            <p className="ai-description">
-              Get suggestions on how to handle identity differences across versions.
+        {activeTab === 'reconciliation' && (
+          <div className="reconciliation-tab">
+            <div className="tab-header">
+              <h4>Identity Reconciliation</h4>
+              <button 
+                onClick={generateReconciliationSuggestions}
+                disabled={isAnalyzing || !comparisonContent}
+                className="run-analysis-button"
+              >
+                {isAnalyzing ? 'Generating...' : 'Generate Suggestions'}
+              </button>
+            </div>
+            
+            <p className="tab-description">
+              Provides suggestions for reconciling identity divergences and managing multiple identity facets.
             </p>
-            
-            <button 
-              onClick={generateReconciliation}
-              disabled={identityAnalysis.length === 0 || isAnalyzing}
-              className="ai-button primary"
-            >
-              {isAnalyzing ? 'Generating Suggestions...' : 'Get Reconciliation Suggestions'}
-            </button>
-            
-            {reconciliationSuggestions.length > 0 && (
-              <div className="reconciliation-results">
-                <h4>Reconciliation Strategies:</h4>
+
+            {reconciliationSuggestions.length > 0 ? (
+              <div className="reconciliation-suggestions">
                 {reconciliationSuggestions.map((suggestion, index) => (
-                  <div key={index} className={`reconciliation-item ${suggestion.type}`}>
+                  <div key={index} className={`suggestion ${suggestion.type} ${suggestion.priority}`}>
                     <div className="suggestion-header">
                       <span className={`suggestion-type ${suggestion.type}`}>
-                        {suggestion.type === 'addition' ? '🔍 Addition (Revealing)' : 
-                         suggestion.type === 'filtering' ? '🛡️ Filtering (Comfortable Sharing)' : 
-                         '🧠 Awareness (Multiple Facets)'}
+                        {suggestion.type.toUpperCase()}
+                      </span>
+                      <span className={`priority-badge ${suggestion.priority}`}>
+                        {suggestion.priority}
                       </span>
                     </div>
-                    <div className="suggestion-content">
-                      <p><strong>Suggestion:</strong> {suggestion.suggestion}</p>
-                      <p><strong>Why:</strong> {suggestion.reasoning}</p>
+                    <h5>{suggestion.description}</h5>
+                    <p className="suggestion-explanation">{suggestion.explanation}</p>
+                    <div className="suggestion-action">
+                      <strong>Action:</strong> {suggestion.actionable}
                     </div>
                   </div>
                 ))}
               </div>
+            ) : (
+              <div className="no-analysis">
+                {comparisonContent ? 
+                  'Click "Generate Suggestions" to get reconciliation recommendations.' :
+                  'Select a version to compare first.'
+                }
+              </div>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* CLEANED UP: Chat Tab */}
-      {activeTab === 'chat' && (
-        <div className="ai-tab-content">
-          <div className="ai-section">
-            <h3>AI Chat with Context</h3>
-            
-            {/* CLEANED UP: Context Management */}
-            <div className="context-section">
-              <div className="context-header">
-                <h4>Selected Context</h4>
-                <button 
-                  onClick={addToContext}
-                  className={`ai-button secondary small ${selectedText && selectedText.length > 3 ? 'highlight' : ''}`}
-                  disabled={!selectedText || selectedText.length <= 3}
-                >
-                  {selectedText && selectedText.length > 3 ? 'Add Selected Text' : 'Select Text First'}
-                </button>
+        {activeTab === 'chat' && (
+          <div className="chat-tab">
+            <h4>Contextual AI Chat</h4>
+            <p className="tab-description">
+              Select text from your main narrative to add context, then ask questions about themes, patterns, or get writing advice.
+            </p>
+
+            {/* Context Display */}
+            {currentContext && (
+              <div className="current-context">
+                <div className="context-header">
+                  <strong>Selected Context:</strong>
+                  <button onClick={clearContext} className="clear-context">×</button>
+                </div>
+                <div className="context-text">
+                  "{currentContext.substring(0, 100)}{currentContext.length > 100 ? '...' : ''}"
+                </div>
               </div>
-              
-              {currentContext ? (
-                <div className="context-display">
-                  <div className="context-item active">
-                    <div className="context-text">
-                      "{currentContext.length > 150 ? currentContext.substring(0, 150) + '...' : currentContext}"
-                    </div>
-                    <button 
-                      onClick={clearContext}
-                      className="context-remove"
-                      title="Clear context"
-                    >
-                      ×
-                    </button>
-                  </div>
+            )}
+
+            {/* Chat Messages */}
+            <div className="chat-messages">
+              {chatMessages.length === 0 ? (
+                <div className="chat-empty">
+                  <p>Start a conversation about your writing, identity themes, or narrative patterns.</p>
                 </div>
               ) : (
-                <div className="no-context-guide">
-                  <p className="no-context">No context selected yet.</p>
-                  <div className="context-steps">
-                    <small>
-                      <strong>How to add context:</strong><br/>
-                      1. Select text in the main editor (left panel)<br/>
-                      2. Click "Add Selected Text" button above<br/>
-                      3. Ask your question with that context
-                    </small>
+                chatMessages.map((message) => (
+                  <div key={message.id} className={`chat-message ${message.role}`}>
+                    <div className="message-content">
+                      {message.content}
+                    </div>
+                    {message.context && (
+                      <div className="message-context">
+                        Context: "{message.context.substring(0, 50)}..."
+                      </div>
+                    )}
+                    <div className="message-timestamp">
+                      {message.timestamp.toLocaleTimeString()}
+                    </div>
+                  </div>
+                ))
+              )}
+              {isChatLoading && (
+                <div className="chat-message assistant loading">
+                  <div className="message-content">
+                    <div className="typing-indicator">
+                      <span></span><span></span><span></span>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Chat History */}
-            <div className="chat-history">
-              {chatHistory.length === 0 && (
-                <div className="chat-placeholder">
-                  <p>💬 Start a conversation about your writing!</p>
-                  <small>Tip: Add context first to get more specific help.</small>
-                </div>
-              )}
-              {chatHistory.map((message, index) => (
-                <div key={index} className={`chat-message ${message.role}`}>
-                  <div className="message-content">{message.content}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* UPDATED: Chat Input */}
+            {/* Chat Input */}
             <div className="chat-input-section">
               <div className="chat-input-wrapper">
                 <textarea
@@ -362,16 +458,16 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
                 />
                 <button 
                   onClick={sendChatMessage}
-                  disabled={!currentMessage.trim() || isAnalyzing}
-                  className="chat-send-button"
+                  disabled={!currentMessage.trim() || isChatLoading}
+                  className="send-button"
                 >
-                  {isAnalyzing ? '...' : 'Send'}
+                  Send
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
