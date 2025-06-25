@@ -30,12 +30,6 @@ interface AlignmentResult {
   similarity?: number;
 }
 
-// Add proper type for best match
-interface BestMatch {
-  original: ContentFingerprint;
-  originalIndex: number;
-}
-
 export interface DiffResult {
   type: 'add' | 'delete' | 'unchanged' | 'modify';
   content: string;
@@ -263,12 +257,17 @@ export class DocumentDiffEngine {
   // Create mergeable segments from alignments
   private createMergeableSegments(alignments: AlignmentResult[]): MergeableSegment[] {
     return alignments.map((alignment, index) => {
+      const node = alignment.revised?.node || alignment.original?.node;
+      if (!node) {
+        throw new Error('Alignment must have either original or revised node');
+      }
+
       const segment: MergeableSegment = {
         id: `${alignment.type}-${index}`,
-        type: this.getNodeType(alignment.revised?.node || alignment.original?.node!),
-        content: alignment.revised?.node || alignment.original?.node!,
+        type: this.getNodeType(node),
+        content: node,
         diffType: alignment.type,
-        preview: this.getNodePreview(alignment.revised?.node || alignment.original?.node!),
+        preview: this.getNodePreview(node),
       };
 
       if (alignment.type === 'modify' && alignment.original && alignment.revised) {

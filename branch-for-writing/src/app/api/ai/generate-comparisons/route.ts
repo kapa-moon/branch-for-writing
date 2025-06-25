@@ -52,8 +52,9 @@ export async function POST(request: NextRequest) {
 
         if (cachedResult.length > 0) {
           console.log('✅ Found cached AI comparison results, returning cached data');
+          const results = cachedResult[0].comparisonResults;
           return NextResponse.json({
-            ...cachedResult[0].comparisonResults,
+            ...(typeof results === 'object' && results !== null ? results : {}),
             cached: true,
             cachedAt: cachedResult[0].createdAt
           });
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       ...comparisonResult,
       cached: false
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ AI comparison generation error:', error);
     
     // Provide more specific error information
@@ -101,15 +102,15 @@ export async function POST(request: NextRequest) {
     if (error instanceof SyntaxError) {
       errorMessage = 'Invalid request format';
       statusCode = 400;
-    } else if (error?.message?.includes('OpenAI')) {
+    } else if (error instanceof Error && error.message.includes('OpenAI')) {
       errorMessage = 'AI service temporarily unavailable';
-    } else if (error?.message?.includes('database') || error?.message?.includes('db')) {
+    } else if (error instanceof Error && (error.message.includes('database') || error.message.includes('db'))) {
       errorMessage = 'Database connection error';
     }
     
     return NextResponse.json({ 
       error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
     }, { status: statusCode });
   }
 }
@@ -263,28 +264,35 @@ Focus on:
       }
       
       comparisonResult = JSON.parse(cleanContent);
-    } catch (parseError) {
+    } catch (parseError: unknown) {
       console.error('❌ Failed to parse OpenAI response as JSON:', parseError);
       console.error('Raw OpenAI content:', content);
-      throw new Error(`OpenAI response parsing failed: ${parseError.message}`);
+      throw new Error(`OpenAI response parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
     }
     
     return comparisonResult;
     
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Error generating AI comparisons:', error);
     
     // Handle different types of OpenAI errors
-    if (error?.code === 'insufficient_quota') {
-      throw new Error('OpenAI quota exceeded. Please check your API billing.');
-    } else if (error?.code === 'invalid_api_key') {
-      throw new Error('Invalid OpenAI API key configuration.');
-    } else if (error?.code === 'model_not_found') {
-      throw new Error('OpenAI model not available.');
-    } else if (error?.message?.includes('timeout')) {
-      throw new Error('OpenAI request timed out. Please try again.');
-    } else if (error?.message?.includes('rate limit')) {
-      throw new Error('OpenAI rate limit exceeded. Please wait and try again.');
+    if (error && typeof error === 'object' && 'code' in error) {
+      const apiError = error as { code: string; message?: string };
+      if (apiError.code === 'insufficient_quota') {
+        throw new Error('OpenAI quota exceeded. Please check your API billing.');
+      } else if (apiError.code === 'invalid_api_key') {
+        throw new Error('Invalid OpenAI API key configuration.');
+      } else if (apiError.code === 'model_not_found') {
+        throw new Error('OpenAI model not available.');
+      }
+    }
+    
+    if (error instanceof Error) {
+      if (error.message.includes('timeout')) {
+        throw new Error('OpenAI request timed out. Please try again.');
+      } else if (error.message.includes('rate limit')) {
+        throw new Error('OpenAI rate limit exceeded. Please wait and try again.');
+      }
     }
     
     // Fallback to a minimal structure if AI fails

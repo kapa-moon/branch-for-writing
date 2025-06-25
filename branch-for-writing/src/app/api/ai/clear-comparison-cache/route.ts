@@ -28,7 +28,7 @@ export async function DELETE(request: NextRequest) {
     console.log('🗑️ Clearing AI comparison cache for user:', session.user.id, { mainDocId, refDocId });
 
     // Delete the specific cached comparison
-    const deletedRows = await db
+    await db
       .delete(aiComparisonResults)
       .where(and(
         eq(aiComparisonResults.mainDocId, mainDocId),
@@ -44,7 +44,7 @@ export async function DELETE(request: NextRequest) {
       mainDocId,
       refDocId
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Error clearing comparison cache:', error);
     
     let errorMessage = 'Failed to clear cache';
@@ -53,13 +53,13 @@ export async function DELETE(request: NextRequest) {
     if (error instanceof SyntaxError) {
       errorMessage = 'Invalid request format';
       statusCode = 400;
-    } else if (error?.message?.includes('database') || error?.message?.includes('db')) {
+    } else if (error instanceof Error && (error.message.includes('database') || error.message.includes('db'))) {
       errorMessage = 'Database connection error';
     }
     
     return NextResponse.json({ 
       error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
     }, { status: statusCode });
   }
 } 
