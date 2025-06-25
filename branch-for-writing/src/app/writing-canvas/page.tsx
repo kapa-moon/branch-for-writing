@@ -670,7 +670,7 @@ export default function WritingCanvasPage() {
                 <strong>Double-click</strong> on any version below to open it for comparison with your current writing.
               </p>
               <p>
-                Then click <strong>"Diff & Merge"</strong> to see changes and selectively merge content.
+                Then click <strong>"Review & Merge"</strong> to see changes and selectively merge content.
               </p>
               <p>
                 <strong>🔒 Saved Versions:</strong> Locked snapshots of your work.<br/>
@@ -802,7 +802,7 @@ export default function WritingCanvasPage() {
                   onClick={() => setDiffMode(!diffMode)} 
                   className={`diff-mode-button ${diffMode ? 'diff-view' : 'normal-view'}`}
                 >
-                  {diffMode ? 'View Document' : 'Diff & Merge'}
+                  {diffMode ? 'View Document' : 'Review & Merge'}
                 </button>
                 <button onClick={handleCloseReview} className="close-review-button">
                   Close Review
