@@ -34,6 +34,7 @@ interface Version {
   content: TiptapDocument;
   type?: 'saved_version' | 'named_version'; // NEW: Add type field
   createdAt?: string; // NEW: Add createdAt field
+  merged?: boolean; // NEW: Add merged field
 }
 
 export default function WritingCanvasPage() {
@@ -50,6 +51,7 @@ export default function WritingCanvasPage() {
   }, [sessionData?.user?.id, sessionData?.user?.name, sessionData?.user?.email]);
   
   const [mainDocumentContent, setMainDocumentContent] = useState<TiptapDocument>(defaultInitialMainDocContent);
+  const [mainDocumentId, setMainDocumentId] = useState<string | null>(null); // NEW: Store main document ID for caching
   const [selectedReviewVersion, setSelectedReviewVersion] = useState<Version | null>(null);
   const [isReviewing, setIsReviewing] = useState<boolean>(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
@@ -128,6 +130,7 @@ export default function WritingCanvasPage() {
           setArticleTitle(data.title);
           // Update localStorage with the loaded content
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data.content));
+          setMainDocumentId(data.id); // NEW: Store main document ID for caching
         } else {
           console.log('No main document in database, checking localStorage');
           // No main document in database, check localStorage
@@ -335,6 +338,36 @@ export default function WritingCanvasPage() {
     } catch (error) {
       console.error('Error deleting version:', error);
       alert('Error deleting version. Please try again.');
+    }
+  };
+
+  const toggleMergeStatus = async (versionId: string, currentMerged: boolean) => {
+    try {
+      const response = await fetch(`/api/versions/${versionId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          merged: !currentMerged,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setVersions(prev => prev.map(v => 
+          v.id === versionId 
+            ? { ...v, merged: !currentMerged }
+            : v
+        ));
+        // Don't show alert for successful merge toggle - it's a quick action
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to ${currentMerged ? 'reopen' : 'merge'} version: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error toggling merge status:', error);
+      alert('Error updating version. Please try again.');
     }
   };
 
@@ -633,24 +666,81 @@ export default function WritingCanvasPage() {
               ) : (
                 versions.map(version => (
                   <li key={version.id} style={{ marginBottom: '8px' }}>
-                    <div onDoubleClick={() => handleOpenVersionForReview(version)} style={{ cursor: 'pointer', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}>
+                    <div 
+                      onDoubleClick={() => handleOpenVersionForReview(version)} 
+                      style={{ 
+                        cursor: 'pointer', 
+                        padding: '8px', 
+                        border: '1px solid #ddd', 
+                        borderRadius: '4px',
+                        opacity: version.merged ? 0.6 : 1,
+                        backgroundColor: version.merged ? '#f5f5f5' : 'white',
+                        filter: version.merged ? 'grayscale(60%)' : 'none',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="version-card"
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
                         <span style={{ fontSize: '0.8rem', marginRight: '6px' }}>
                           {version.type === 'saved_version' ? '🔒' : '📝'}
                         </span>
-                        <strong style={{ fontSize: '0.9rem' }}>{version.name}</strong>
+                        <strong style={{ 
+                          fontSize: '0.9rem',
+                          color: version.merged ? '#666' : 'inherit'
+                        }}>
+                          {version.name}
+                          {version.merged && <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: '#999' }}>(merged)</span>}
+                        </strong>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#666' }}>
+                      <div style={{ fontSize: '0.75rem', color: version.merged ? '#999' : '#666' }}>
                         {version.timestamp}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => deleteVersion(version.id)}
-                      className="delete-version-button"
-                      style={{ marginTop: '4px', fontSize: '0.7rem' }}
-                    >
-                      Delete
-                    </button>
+                    <div className="version-buttons" style={{ 
+                      marginTop: '4px', 
+                      display: 'flex', 
+                      gap: '4px',
+                      opacity: 0,
+                      transition: 'opacity 0.2s ease'
+                    }}>
+                      {/* Only show merge button for named versions, not saved versions */}
+                      {version.type === 'named_version' && (
+                        <button 
+                          onClick={() => toggleMergeStatus(version.id, version.merged || false)}
+                          className="merge-version-button"
+                          style={{ 
+                            fontSize: '0.7rem',
+                            padding: '2px 8px',
+                            backgroundColor: version.merged ? '#fff3cd' : '#d1f2d1',
+                            color: version.merged ? '#856404' : '#155724',
+                            border: `1px solid ${version.merged ? '#ffeaa7' : '#c3e6cb'}`,
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            if (!version.merged) {
+                              e.currentTarget.style.backgroundColor = '#c3e6cb';
+                            } else {
+                              e.currentTarget.style.backgroundColor = '#ffeaa7';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = version.merged ? '#fff3cd' : '#d1f2d1';
+                          }}
+                          title={version.merged ? 'Reopen this version' : 'Mark as merged'}
+                        >
+                          {version.merged ? 'Reopen' : 'Merge'}
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => deleteVersion(version.id)}
+                        className="delete-version-button"
+                        style={{ fontSize: '0.7rem' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </li>
                 ))
               )}
@@ -694,6 +784,8 @@ export default function WritingCanvasPage() {
                 comparisonContent={selectedReviewVersion.content}
                 onMergeSegments={handleMergeSegments}
                 onHighlightText={highlightTextInMainEditor}
+                mainDocId={mainDocumentId || undefined}
+                refDocId={selectedReviewVersion.id}
               />
             ) : (
               <TiptapEditor 

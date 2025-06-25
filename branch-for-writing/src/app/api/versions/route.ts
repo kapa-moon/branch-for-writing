@@ -37,7 +37,7 @@ export async function GET() {
 
     // Combine and format all versions
     const allVersions = [
-      // Locked main documents (saved versions)
+      // Locked main documents (saved versions) - these don't have merge status
       ...lockedMainDocs.map(doc => ({
         id: doc.id,
         name: `Saved Version: ${doc.title}`,
@@ -45,8 +45,9 @@ export async function GET() {
         content: doc.content as TiptapDocument,
         type: 'saved_version' as const,
         createdAt: doc.createdAt.toISOString(),
+        merged: false, // Saved versions don't have merge functionality
       })),
-      // Named versions
+      // Named versions - include merge status
       ...namedVersions.map(version => ({
         id: version.id,
         name: version.name,
@@ -54,6 +55,7 @@ export async function GET() {
         content: version.content as TiptapDocument,
         type: 'named_version' as const,
         createdAt: version.createdAt.toISOString(),
+        merged: version.merged || false, // Include merge status from database
       }))
     ];
 
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest) {
         name,
         content,
         userId: session.user.id,
+        merged: false, // New versions start as not merged
       })
       .returning();
 
@@ -105,6 +108,7 @@ export async function POST(request: NextRequest) {
       content: newVersion[0].content as TiptapDocument,
       type: 'named_version',
       createdAt: newVersion[0].createdAt.toISOString(),
+      merged: newVersion[0].merged || false,
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating version:', error);

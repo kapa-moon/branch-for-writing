@@ -1,0 +1,1 @@
+ALTER TABLE "document_versions" ADD COLUMN "merged" boolean DEFAULT false NOT NULL;

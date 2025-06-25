@@ -262,7 +262,7 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
   return (
     <div className="ai-tool-wrapper enhanced">
       <div className="enhanced-ai-header">
-        <h3>🧰 AI Toolbox</h3>
+        <h3 className="ai-toolbox-title">AI Toolbox</h3>
         <div className="tab-selector">
           {/* Analysis tab temporarily hidden
           <button 
@@ -392,10 +392,10 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
 
         {activeTab === 'chat' && (
           <div className="chat-tab">
-            <h4>Contextual AI Chat</h4>
+{/* 
             <p className="tab-description">
               Select text from your main narrative to add context, then ask questions about themes, patterns, or get writing advice.
-            </p>
+            </p> */}
 
             {/* Context Display */}
             {currentContext && (

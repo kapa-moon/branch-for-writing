@@ -25,6 +25,18 @@ export const documentVersions = pgTable('document_versions', {
   name: text('name').notNull(),
   content: jsonb('content').notNull(), // Store TiptapDocument as JSONB
   supporter: text('supporter'), // NEW: Supporter field that can be NULL
+  merged: boolean('merged').notNull().default(false), // NEW: Track whether version has been merged
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+});
+
+// AI comparison results table for caching AI diffing results
+export const aiComparisonResults = pgTable('ai_comparison_results', {
+  id: text('id').primaryKey(),
+  mainDocId: text('main_doc_id').notNull(), // Reference to main document or version being compared
+  refDocId: text('ref_doc_id').notNull(), // Reference to comparison document or version
+  comparisonResults: jsonb('comparison_results').notNull(), // Store the complete AI analysis results
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
   updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
