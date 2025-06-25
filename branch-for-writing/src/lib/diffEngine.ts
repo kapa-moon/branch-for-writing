@@ -4,6 +4,38 @@ import { TiptapDocument, TiptapNode } from '@/types/tiptap';
 // Create type alias for the diff operations
 type DiffOperation = -1 | 0 | 1; // DELETE, EQUAL, INSERT
 
+// Add proper types for the diff-match-patch library
+interface DiffMatchPatch {
+  diff_main(text1: string, text2: string): Array<[DiffOperation, string]>;
+  diff_cleanupSemantic(diffs: Array<[DiffOperation, string]>): void;
+  Diff_Timeout: number;
+  Diff_EditCost: number;
+}
+
+// Add proper types for content fingerprints
+interface ContentFingerprint {
+  index: number;
+  node: TiptapNode;
+  text: string;
+  fingerprint: string;
+}
+
+// Add proper types for alignment results
+interface AlignmentResult {
+  type: 'unchanged' | 'modify' | 'delete' | 'add';
+  original?: ContentFingerprint;
+  revised?: ContentFingerprint;
+  originalIndex?: number;
+  revisedIndex?: number;
+  similarity?: number;
+}
+
+// Add proper type for best match
+interface BestMatch {
+  original: ContentFingerprint;
+  originalIndex: number;
+}
+
 export interface DiffResult {
   type: 'add' | 'delete' | 'unchanged' | 'modify';
   content: string;
@@ -28,19 +60,19 @@ export interface WordDiff {
 }
 
 export class DocumentDiffEngine {
-  private dmp: any;
+  private dmp: DiffMatchPatch | null;
 
   constructor() {
     // FIXED: Try different instantiation approaches
     try {
       // Most common: library exposes `diff_match_patch` constructor
-      this.dmp = new (DMP as any).diff_match_patch();
-    } catch (e) {
+      this.dmp = new (DMP as unknown as { diff_match_patch: new () => DiffMatchPatch }).diff_match_patch();
+    } catch {
       try {
         // Fallback: if a default export is provided
-        const DefaultCtor = (DMP as any).default ?? (DMP as any);
+        const DefaultCtor = (DMP as unknown as { default?: new () => DiffMatchPatch }).default ?? (DMP as unknown as new () => DiffMatchPatch);
         this.dmp = new DefaultCtor();
-      } catch (e2) {
+      } catch {
         // Fallback to basic diff if library fails
         console.warn('diff-match-patch library failed to initialize, using basic diff');
         this.dmp = null;
@@ -88,8 +120,8 @@ export class DocumentDiffEngine {
   }
 
   // Smart alignment algorithm
-  private alignNodes(original: any[], revised: any[]): any[] {
-    const alignments: any[] = [];
+  private alignNodes(original: ContentFingerprint[], revised: ContentFingerprint[]): AlignmentResult[] {
+    const alignments: AlignmentResult[] = [];
     const usedOriginal = new Set<number>();
     const usedRevised = new Set<number>();
 
@@ -117,7 +149,8 @@ export class DocumentDiffEngine {
     revised.forEach((rev, revIdx) => {
       if (usedRevised.has(revIdx)) return;
       
-      let bestMatch: { original: any; originalIndex: number } | null = null;
+      let bestMatch: ContentFingerprint | null = null;
+      let bestMatchIndex = -1;
       let bestSimilarity = 0;
       
       original.forEach((orig, origIdx) => {
@@ -125,22 +158,22 @@ export class DocumentDiffEngine {
         
         const similarity = this.calculateSimilarity(orig.text, rev.text);
         if (similarity > bestSimilarity && similarity > 0.3) { // 30% threshold
-          bestMatch = { original: orig, originalIndex: origIdx };
+          bestMatch = orig;
+          bestMatchIndex = origIdx;
           bestSimilarity = similarity;
         }
       });
 
-      if (bestMatch) {
-        const bm: any = bestMatch;
+      if (bestMatch && bestMatchIndex !== -1) {
         alignments.push({
           type: 'modify',
-          original: bm.original,
+          original: bestMatch,
           revised: rev,
-          originalIndex: bm.originalIndex,
+          originalIndex: bestMatchIndex,
           revisedIndex: revIdx,
           similarity: bestSimilarity
         });
-        usedOriginal.add(bm.originalIndex);
+        usedOriginal.add(bestMatchIndex);
         usedRevised.add(revIdx);
       }
     });
@@ -228,17 +261,17 @@ export class DocumentDiffEngine {
   }
 
   // Create mergeable segments from alignments
-  private createMergeableSegments(alignments: any[]): MergeableSegment[] {
+  private createMergeableSegments(alignments: AlignmentResult[]): MergeableSegment[] {
     return alignments.map((alignment, index) => {
       const segment: MergeableSegment = {
         id: `${alignment.type}-${index}`,
-        type: this.getNodeType(alignment.revised?.node || alignment.original?.node),
-        content: alignment.revised?.node || alignment.original?.node,
+        type: this.getNodeType(alignment.revised?.node || alignment.original?.node!),
+        content: alignment.revised?.node || alignment.original?.node!,
         diffType: alignment.type,
-        preview: this.getNodePreview(alignment.revised?.node || alignment.original?.node),
+        preview: this.getNodePreview(alignment.revised?.node || alignment.original?.node!),
       };
 
-      if (alignment.type === 'modify') {
+      if (alignment.type === 'modify' && alignment.original && alignment.revised) {
         segment.originalContent = alignment.original.node;
         segment.similarity = alignment.similarity;
         segment.wordDiffs = this.generateWordDiffs(
@@ -318,7 +351,7 @@ export class DocumentDiffEngine {
       similarity: 0
     };
 
-    let totalNodes = segments.length;
+    const totalNodes = segments.length;
     let unchangedNodes = 0;
 
     segments.forEach(segment => {
