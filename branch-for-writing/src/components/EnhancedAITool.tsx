@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TiptapDocument } from '@/types/tiptap';
 import { IdentityDiffEngine, IdentityDiffResult, ThemeComparison } from '@/lib/diffEngine';
 import './ai-tool.css';
@@ -8,6 +8,8 @@ interface EnhancedAIToolProps {
   comparisonContent?: TiptapDocument;
   selectedText?: string;
   onRequestTextSelection?: () => void;
+  mainDocId?: string;
+  refDocId?: string;
 }
 
 interface ContextItem {
@@ -45,7 +47,9 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
   mainContent, 
   comparisonContent,
   selectedText,
-  onRequestTextSelection
+  onRequestTextSelection,
+  mainDocId,
+  refDocId
 }) => {
   // Default to 'chat'; 'analysis' tab option hidden for now
   const [activeTab, setActiveTab] = useState<'analysis' | 'reconciliation' | 'chat'>('chat');
@@ -63,12 +67,53 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [isChatLoading, setIsChatLoading] = useState(false);
 
+  // Ref for textarea auto-resize
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   // Auto-add selected text to context
   useEffect(() => {
     if (selectedText && selectedText.trim().length > 3) {
       setCurrentContext(selectedText.trim());
     }
   }, [selectedText]);
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      const minHeight = 60; // Increased from 40px
+      const maxHeight = 80; // Approximately 4 lines
+      textarea.style.height = Math.min(Math.max(scrollHeight, minHeight), maxHeight) + 'px';
+    }
+  }, [currentMessage]);
+
+  // Function to handle textarea resize
+  const handleTextareaResize = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      const minHeight = 60; // Increased from 40px
+      const maxHeight = 80; // Approximately 4 lines
+      textarea.style.height = Math.min(Math.max(scrollHeight, minHeight), maxHeight) + 'px';
+    }
+  }, []);
+
+  // Initialize textarea height on mount
+  useEffect(() => {
+    handleTextareaResize();
+  }, [handleTextareaResize]);
+
+  // Handle message change and resize
+  const handleMessageChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCurrentMessage(e.target.value);
+    // Trigger resize on next frame to ensure new content is rendered
+    requestAnimationFrame(() => {
+      handleTextareaResize();
+    });
+  }, [handleTextareaResize]);
 
   const runIdentityAnalysis = async () => {
     if (!comparisonContent) {
@@ -130,13 +175,33 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
     setIsChatLoading(true);
 
     try {
-      // TODO: Replace with actual OpenAI API call
-      const response = await generateDummyChatResponse(currentMessage, currentContext, mainContent);
+      // Call the real API instead of dummy function
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: currentMessage,
+          mainContent,
+          comparisonContent,
+          selectedContext: currentContext,
+          chatHistory: chatMessages.slice(-5), // Send last 5 messages for context
+          mainDocId, // Pass document IDs for database storage
+          refDocId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Chat API failed: ${response.status}`);
+      }
+
+      const data = await response.json();
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response,
+        content: data.response,
         timestamp: new Date()
       };
 
@@ -238,25 +303,6 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
         actionable: 'Reflect on how different aspects of yourself emerge in different contexts.'
       }
     ];
-  };
-
-  const generateDummyChatResponse = async (message: string, context: string, content: TiptapDocument): Promise<string> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (context) {
-      return `Based on the selected text "${context.substring(0, 50)}...", I can see this relates to identity themes around personal growth and self-reflection. This passage shows elements of both agency (taking control) and meaning-making (learning from experience). Would you like me to suggest how this might connect to other parts of your narrative?`;
-    }
-    
-    if (message.toLowerCase().includes('identity')) {
-      return `Your narrative shows strong identity development patterns. I notice themes of growth, self-reflection, and evolving relationships. The comparison between your versions suggests you're developing a more integrated sense of self. What specific aspect of your identity development would you like to explore further?`;
-    }
-    
-    if (message.toLowerCase().includes('theme')) {
-      return `The main themes I see in your writing include personal agency, meaningful relationships, overcoming challenges, and self-discovery. These are common in emerging adult narratives. Which theme resonates most strongly with your current life experience?`;
-    }
-    
-    return `I'm analyzing your narrative for identity themes, emotional patterns, and personal growth indicators. Feel free to select specific text from your writing and ask me about identity patterns, themes, or how different versions compare. What would you like to explore?`;
   };
 
   return (
@@ -392,21 +438,14 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
 
         {activeTab === 'chat' && (
           <div className="chat-tab">
-{/* 
-            <p className="tab-description">
-              Select text from your main narrative to add context, then ask questions about themes, patterns, or get writing advice.
-            </p> */}
-
-            {/* Context Display */}
+            {/* Context Display - simplified to one line */}
             {currentContext && (
               <div className="current-context">
                 <div className="context-header">
                   <strong>Selected Context:</strong>
-                  <button onClick={clearContext} className="clear-context">×</button>
+                  <span className="context-text">"{currentContext.substring(0, 100)}{currentContext.length > 100 ? '...' : ''}"</span>
                 </div>
-                <div className="context-text">
-                  "{currentContext.substring(0, 100)}{currentContext.length > 100 ? '...' : ''}"
-                </div>
+                <button onClick={clearContext} className="clear-context">×</button>
               </div>
             )}
 
@@ -444,28 +483,32 @@ const EnhancedAITool: React.FC<EnhancedAIToolProps> = ({
               )}
             </div>
 
-            {/* Chat Input */}
+            {/* Chat Input - fixed at bottom with new layout */}
             <div className="chat-input-section">
-              <div className="chat-input-wrapper">
+              <div className="chat-input-container">
                 <textarea
                   value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  onChange={handleMessageChange}
+                  onInput={handleTextareaResize}
                   className="chat-input"
-                  rows={3}
+                  placeholder="Ask about your writing, identity themes, or narrative patterns..."
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       sendChatMessage();
                     }
                   }}
+                  ref={textareaRef}
                 />
-                <button 
-                  onClick={sendChatMessage}
-                  disabled={!currentMessage.trim() || isChatLoading}
-                  className="send-button"
-                >
-                  Send
-                </button>
+                <div className="chat-send-row">
+                  <button 
+                    onClick={sendChatMessage}
+                    disabled={!currentMessage.trim() || isChatLoading}
+                    className="send-button"
+                  >
+                    Send
+                  </button>
+                </div>
               </div>
             </div>
           </div>

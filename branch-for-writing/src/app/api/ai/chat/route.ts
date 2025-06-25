@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { db } from '@/lib/db';
+import { aiChatRecords } from '../../../../../database/schema';
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -8,13 +12,44 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, mainContent, comparisonContent, selectedContext, chatHistory } = await request.json();
+    const { message, mainContent, comparisonContent, selectedContext, chatHistory, mainDocId, refDocId } = await request.json();
     
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
+
+    // Get user session for authentication
+    const headersList = await headers();
+    const session = await auth.api.getSession({
+      headers: headersList
+    });
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     
     const response = await generateContextualResponse(message, mainContent, comparisonContent, selectedContext, chatHistory);
+    
+    // Save the chat interaction to database
+    const chatRecord = {
+      id: `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      mainDocId: mainDocId || null,
+      refDocId: refDocId || null,
+      contextContent: selectedContext || null,
+      userPrompt: message,
+      aiOutput: response,
+      userId: session.user.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    try {
+      await db.insert(aiChatRecords).values(chatRecord);
+      console.log('💾 Chat record saved to database:', { id: chatRecord.id, userId: session.user.id });
+    } catch (dbError) {
+      console.error('❌ Failed to save chat record to database:', dbError);
+      // Continue anyway - don't fail the chat because of DB issues
+    }
     
     return NextResponse.json({ response });
   } catch (error) {

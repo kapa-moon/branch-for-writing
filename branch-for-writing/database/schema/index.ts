@@ -40,4 +40,17 @@ export const aiComparisonResults = pgTable('ai_comparison_results', {
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
   updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+});
+
+// AI chat record table for storing chat interactions
+export const aiChatRecords = pgTable('ai_chat_records', {
+  id: text('id').primaryKey(),
+  mainDocId: text('main_doc_id'), // Reference to main document (nullable)
+  refDocId: text('ref_doc_id'), // Reference to comparison document (nullable)
+  contextContent: text('context_content'), // Selected text context (nullable)
+  userPrompt: text('user_prompt').notNull(), // User's input message
+  aiOutput: text('ai_output').notNull(), // AI's response
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
 }); 

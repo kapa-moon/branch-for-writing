@@ -627,17 +627,39 @@ export default function WritingCanvasPage() {
 
       {isSideMenuOpen && (
         <div className="versions-side-menu">
-          <button onClick={() => setIsSideMenuOpen(false)} className="side-menu-close-button">X</button>
-          
           <div className="versions-header">
-            <h2>Versions</h2>
-            <button 
-              onClick={() => setShowVersionsInfo(!showVersionsInfo)}
-              className="info-toggle-button"
-              title="Show help"
-            >
-              ℹ️
-            </button>
+            <h2 style={{ fontSize: '1rem', fontWeight: 'normal', margin: '0 0 10px 0' }}>Previous Versions</h2>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => setShowVersionsInfo(!showVersionsInfo)}
+                className="info-toggle-button"
+                title="Show help"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  opacity: '0.6',
+                  padding: '2px'
+                }}
+              >
+                ℹ️
+              </button>
+              <button 
+                onClick={() => setIsSideMenuOpen(false)} 
+                className="side-menu-close-button"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  opacity: '0.6',
+                  padding: '2px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
           </div>
           
           {/* NEW: Toggleable UX Hint Card */}
@@ -691,6 +713,20 @@ export default function WritingCanvasPage() {
                           {version.name}
                           {version.merged && <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: '#999' }}>(merged)</span>}
                         </strong>
+                        {version.type === 'saved_version' && (
+                          <span style={{
+                            marginLeft: '8px',
+                            fontSize: '0.65rem',
+                            padding: '2px 6px',
+                            backgroundColor: '#f8f9fa',
+                            color: '#000',
+                            border: '1px solid #000',
+                            borderRadius: '3px',
+                            fontWeight: 'normal'
+                          }}>
+                            Main
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: version.merged ? '#999' : '#666' }}>
                         {version.timestamp}
@@ -711,22 +747,17 @@ export default function WritingCanvasPage() {
                           style={{ 
                             fontSize: '0.7rem',
                             padding: '2px 8px',
-                            backgroundColor: version.merged ? '#fff3cd' : '#d1f2d1',
-                            color: version.merged ? '#856404' : '#155724',
-                            border: `1px solid ${version.merged ? '#ffeaa7' : '#c3e6cb'}`,
+                            backgroundColor: '#ffffff',
+                            color: '#000',
+                            border: '1px solid #000',
                             borderRadius: '3px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
+                            cursor: 'pointer'
                           }}
                           onMouseOver={(e) => {
-                            if (!version.merged) {
-                              e.currentTarget.style.backgroundColor = '#c3e6cb';
-                            } else {
-                              e.currentTarget.style.backgroundColor = '#ffeaa7';
-                            }
+                            e.currentTarget.style.backgroundColor = '#f0f8f0';
                           }}
                           onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor = version.merged ? '#fff3cd' : '#d1f2d1';
+                            e.currentTarget.style.backgroundColor = '#ffffff';
                           }}
                           title={version.merged ? 'Reopen this version' : 'Mark as merged'}
                         >
@@ -803,6 +834,8 @@ export default function WritingCanvasPage() {
             mainContent={mainDocumentContent} 
             comparisonContent={selectedReviewVersion?.content}
             selectedText={selectedText}
+            mainDocId={mainDocumentId || undefined}
+            refDocId={selectedReviewVersion?.id}
             onRequestTextSelection={() => {
               alert('Please select text in the main editor (left panel) to add to context.');
             }}

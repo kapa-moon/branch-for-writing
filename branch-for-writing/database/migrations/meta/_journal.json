@@ -57,6 +57,13 @@
       "when": 1750821683174,
       "tag": "0007_tense_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1750825564899,
+      "tag": "0008_dusty_jackpot",
+      "breakpoints": true
     }
   ]
 }
