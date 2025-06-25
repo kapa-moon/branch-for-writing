@@ -53,7 +53,7 @@ Please provide an enhanced analysis in the following JSON format:
   "narrativeCoherence": "Assessment of how this difference affects overall narrative coherence"
 }
 
-IMPORTANT: Respond with ONLY valid JSON, no markdown formatting or code blocks. Do not wrap your response in ```json or ```.
+IMPORTANT: Respond with ONLY valid JSON, no markdown formatting or code blocks. Do not wrap your response in \`\`\`json or \`\`\`.
 
 Focus on providing insights that are:
 1. Psychologically informed but accessible
