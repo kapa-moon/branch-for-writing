@@ -9,6 +9,8 @@ import Highlight from '@tiptap/extension-highlight';
 import Underline from '@tiptap/extension-underline';
 import { Editor } from '@tiptap/core';
 import { TiptapDocument } from '@/types/tiptap';
+import { UserComment } from '@/types/comments';
+import CommentHighlight from './extensions/CommentHighlight';
 import './tiptap-editor.css';
 
 interface TiptapEditorProps {
@@ -17,11 +19,15 @@ interface TiptapEditorProps {
   onTextSelection?: (selectedText: string) => void;
   isEditable?: boolean;
   editorRef?: React.MutableRefObject<Editor | null>;
+  userComments?: UserComment[];
+  onCommentClick?: (commentId: string) => void;
+  temporaryHighlight?: { from: number; to: number } | null;
 }
 
-const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEditable = true, editorRef }: TiptapEditorProps) => {
-  const editor = useEditor({
-    extensions: [
+const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEditable = true, editorRef, userComments = [], onCommentClick, temporaryHighlight }: TiptapEditorProps) => {
+  // Build extensions array with error handling
+  const getExtensions = () => {
+    const baseExtensions = [
       StarterKit,
       Highlight.configure({
         multicolor: true,
@@ -30,7 +36,24 @@ const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEdit
         placeholder: isEditable ? 'please start writing here' : 'Reviewing version...',
       }),
       Underline,
-    ],
+    ];
+
+    // Try to add CommentHighlight extension
+    try {
+      if (onCommentClick) {
+        baseExtensions.push(CommentHighlight.configure({
+          onCommentClick: onCommentClick,
+        }));
+      }
+    } catch (error) {
+      console.warn('Failed to load CommentHighlight extension:', error);
+    }
+
+    return baseExtensions;
+  };
+
+  const editor = useEditor({
+    extensions: getExtensions(),
     content: initialContent,
     editable: isEditable,
     onUpdate: ({ editor: currentEditor }) => {
@@ -106,6 +129,94 @@ const TiptapEditor = ({ initialContent, onContentChange, onTextSelection, isEdit
       }
     }
   }, [editor, initialContent]);
+
+  // Highlight comments in the editor
+  useEffect(() => {
+    if (editor && editor.state && onCommentClick) {
+      // Small delay to ensure editor is fully ready
+      const timer = setTimeout(() => {
+        try {
+          // Check if CommentHighlight extension and commands are available
+          if (!editor.commands || 
+              typeof editor.commands.unsetCommentHighlight !== 'function' ||
+              typeof editor.commands.setCommentHighlight !== 'function') {
+            console.log('Comment highlight extension not loaded, skipping highlighting');
+            return;
+          }
+          
+          // Always clear existing comment highlights first
+          editor.commands.unsetCommentHighlight();
+          
+          // Force clear all comment highlights by removing the mark from the entire document
+          const { from, to } = editor.state.selection;
+          const docSize = editor.state.doc.content.size;
+          if (docSize > 0) {
+            editor.chain()
+              .setTextSelection({ from: 0, to: docSize })
+              .unsetMark('commentHighlight')
+              .setTextSelection({ from, to })
+              .run();
+          }
+          
+          // If we have comments, apply highlights
+          if (userComments.length > 0) {
+            userComments.forEach(comment => {
+              if (!comment.resolved && comment.position) {
+                const { from, to } = comment.position;
+                
+                // Verify the position is still valid
+                const doc = editor.state?.doc;
+                if (doc && from >= 0 && to <= doc.content.size && from < to) {
+                  editor
+                    .chain()
+                    .setTextSelection({ from, to })
+                    .setCommentHighlight({ commentId: comment.id })
+                    .run();
+                }
+              }
+            });
+          }
+          
+          // Clear selection after highlighting
+          if (editor.commands.blur) {
+            editor.commands.blur();
+          }
+        } catch (error) {
+          console.warn('Error highlighting comments:', error);
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [editor, userComments, onCommentClick]);
+
+  // Handle temporary highlighting during comment creation
+  useEffect(() => {
+    if (editor && editor.state && temporaryHighlight) {
+      try {
+        const { from, to } = temporaryHighlight;
+        const doc = editor.state.doc;
+        
+        if (from >= 0 && to <= doc.content.size && from < to) {
+          // Add temporary yellow highlight using built-in Highlight extension
+          editor
+            .chain()
+            .setTextSelection({ from, to })
+            .setHighlight()
+            .run();
+        }
+      } catch (error) {
+        console.warn('Error applying temporary highlight:', error);
+      }
+    } else if (editor && !temporaryHighlight) {
+      // Clear temporary highlights when no temporary highlight is needed
+      try {
+        editor.commands.unsetHighlight();
+      } catch (error) {
+        console.warn('Error clearing temporary highlight:', error);
+      }
+    }
+  }, [editor, temporaryHighlight]);
 
   return (
     <div className="tiptap-editor-wrapper">

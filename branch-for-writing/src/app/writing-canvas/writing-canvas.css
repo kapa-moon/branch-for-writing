@@ -281,7 +281,8 @@ body {
     flex-grow: 1; /* Allow wrapper to take remaining vertical space */
     overflow: hidden; /* Prevent content overflow from affecting page layout */
     position: relative; /* Add relative positioning for absolute child */
-    gap: 10px; /* Add gap between editor and AI toolbox */
+    gap: 0; /* Remove gap to prevent layout issues */
+    box-sizing: border-box;
 }
 
 /* Remove the margin-right approach since AI toolbox is now inside */
@@ -293,24 +294,26 @@ body {
     border: 1px solid #ccc;
     border-radius: 0px;
     padding: 10px;
-    height: 75vh;
+    height: 80vh;
     background-color: #fff; /* Ensure background for editors */
     display: flex; /* Use flex to manage internal layout, e.g., close button */
     flex-direction: column; /* Stack editor and close button */
     overflow-y: auto; /* Allow individual editor scrolling */
     scrollbar-width: none;
+    box-sizing: border-box;
 }
 
 .tiptap-editor-container-tool-open {
     border: 1px solid #ccc;
     border-radius: 0px;
     padding: 10px;
-    height: 75vh; /* Keep same height as normal container since we're using sidebar now */
+    height: 80vh; /* Keep same height as normal container since we're using sidebar now */
     background-color: #fff; /* Ensure background for editors */
     display: flex; /* Use flex to manage internal layout, e.g., close button */
     flex-direction: column; /* Stack editor and close button */
     overflow-y: auto; /* Allow individual editor scrolling */
     scrollbar-width: none;
+    box-sizing: border-box;
 }
 
 .tiptap-editor-container .ProseMirror {
@@ -323,16 +326,41 @@ body {
 .editor-wrapper.single-mode .main-editor-container {
     flex: 0 0 65%;
     margin: 0 auto; /* Center it */
+    box-sizing: border-box;
 }
 
-/* Review mode (both editors take ~50%) */
+/* Review mode - flexible layout based on what's shown */
 .editor-wrapper.review-mode .main-editor-container{
-    flex: 1 1 50%; /* Each takes half, allows shrinking/growing equally */
-    margin-right: 5px; /* Spacing between them */
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
-.editor-wrapper.review-mode .review-editor-container {
-    flex: 1 1 50%; /* Each takes half, allows shrinking/growing equally */
-    margin-left: 5px; /* Spacing between them */
+
+.editor-wrapper.review-mode .comment-cards-column {
+    width: 25%;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+.editor-wrapper.review-mode .reference-editor-container {
+    width: calc(32% - 10px); /* Subtract margin from width */
+    flex-shrink: 0;
+    box-sizing: border-box;
+    margin-right: 10px; /* Add small right margin to prevent edge cutoff */
+}
+
+/* When both comment margin and reference are shown */
+.editor-wrapper.review-mode.both-panels .main-editor-container {
+    width: 43%;
+}
+
+/* When only comment margin is shown */
+.editor-wrapper.review-mode.comment-only .main-editor-container {
+    width: 75%;
+}
+
+/* When only reference document is shown */
+.editor-wrapper.review-mode.reference-only .main-editor-container {
+    width: 68%;
 }
 
 .ProseMirror:focus {
@@ -346,6 +374,7 @@ body {
 .ProseMirror {
     font-family: 'Atkinson Hyperlegible', serif;
     line-height: 1.8; /* Increased from default ~1.2 by 50% */
+    font-size: 14px; /* Decreased from default 16px */
 }
 
 /* Add these styles to your existing writing-canvas.css file */
@@ -354,11 +383,11 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 0;
   background: #f8f9fa;
   border-bottom: 1px solid #dee2e6;
   margin-bottom: 0;
-  border-radius: 8px 8px 0 0;
+  border-radius: 0;
 }
 
 .review-buttons {
@@ -370,11 +399,11 @@ body {
 .close-review-button,
 .diff-mode-button {
   border: 1px solid #000;
-  padding: 8px 16px;
+  padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   height: 36px;
   display: flex;
   align-items: center;

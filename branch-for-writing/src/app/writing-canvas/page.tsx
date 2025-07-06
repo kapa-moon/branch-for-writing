@@ -1,19 +1,24 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import TiptapEditor from '@/components/TiptapEditor';
 import DiffTiptapEditor from '@/components/DiffTiptapEditor';
+import CommentCards from '@/components/CommentCards';
 import EnhancedAITool from '@/components/EnhancedAITool';
+import CommentCreator from '@/components/CommentCreator';
+import CommentTooltip from '@/components/CommentTooltip';
 import './writing-canvas.css';
 import { TiptapDocument } from '@/types/tiptap';
+import { UserComment } from '@/types/comments';
 import AITool from '@/components/AITool';
 import { DocumentDiffEngine } from '@/lib/diffEngine';
 // @ts-ignore - type provided by @tiptap/core at runtime, suppress if linter cannot resolve
 import { Editor } from '@tiptap/core';
 
 const LOCAL_STORAGE_KEY = 'tiptap-main-document';
+const COMMENTS_STORAGE_KEY = 'tiptap-user-comments';
 
 // Initial content if nothing is in local storage for the main editor
 const defaultInitialMainDocContent: TiptapDocument = {
@@ -54,15 +59,13 @@ export default function WritingCanvasPage() {
   const [mainDocumentId, setMainDocumentId] = useState<string | null>(null); // NEW: Store main document ID for caching
   const [selectedReviewVersion, setSelectedReviewVersion] = useState<Version | null>(null);
   const [isReviewing, setIsReviewing] = useState<boolean>(false);
+  const [showCommentMargin, setShowCommentMargin] = useState<boolean>(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
   const [isAIToolOpen, setAIToolOpen] = useState<boolean>(false);
   const [versions, setVersions] = useState<Version[]>([]);
   const [isLoadingVersions, setIsLoadingVersions] = useState<boolean>(false);
   const [isSavingVersion, setIsSavingVersion] = useState<boolean>(false);
   
-  // NEW: Add diff mode state
-  const [diffMode, setDiffMode] = useState<boolean>(false);
-
   // Add this state variable with your other useState declarations (around line 48)
   const [selectedText, setSelectedText] = useState<string>('');
 
@@ -72,6 +75,21 @@ export default function WritingCanvasPage() {
   // Article title state
   const [articleTitle, setArticleTitle] = useState<string>('Untitled Article');
   const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
+
+  // Comment system state
+  const [userComments, setUserComments] = useState<UserComment[]>([]);
+  const [showCommentTooltip, setShowCommentTooltip] = useState<boolean>(false);
+  const [commentTooltipPosition, setCommentTooltipPosition] = useState<{x: number, y: number} | null>(null);
+  const [commentSelectedText, setCommentSelectedText] = useState<string>('');
+  const [commentTextRange, setCommentTextRange] = useState<{from: number, to: number} | null>(null);
+  const [inlineCommentData, setInlineCommentData] = useState<{
+    selectedText: string;
+    authorName: string;
+    authorEmail: string;
+    position: { from: number; to: number };
+  } | null>(null);
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+  const [tooltipTimeoutId, setTooltipTimeoutId] = useState<NodeJS.Timeout | null>(null);
 
   const mainEditorRef = React.useRef<Editor | null>(null);
 
@@ -98,6 +116,60 @@ export default function WritingCanvasPage() {
     // This logic is now handled in loadLatestMainDocument()
     // We'll let the database be the source of truth for the "current main document"
   }, []);
+
+  // Load user comments from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedComments = localStorage.getItem(COMMENTS_STORAGE_KEY);
+      if (savedComments) {
+        const parsedComments = JSON.parse(savedComments);
+        // Convert createdAt strings back to Date objects
+        const commentsWithDates = parsedComments.map((comment: any) => ({
+          ...comment,
+          createdAt: new Date(comment.createdAt)
+        }));
+        setUserComments(commentsWithDates);
+      }
+    } catch (error) {
+      console.error('Error loading user comments from localStorage:', error);
+    }
+  }, []);
+
+  // Save user comments to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(COMMENTS_STORAGE_KEY, JSON.stringify(userComments));
+    } catch (error) {
+      console.error('Error saving user comments to localStorage:', error);
+    }
+  }, [userComments]);
+
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showCommentTooltip) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.comment-tooltip') && !target.closest('.ProseMirror')) {
+          setShowCommentTooltip(false);
+          setCommentTooltipPosition(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCommentTooltip]);
+
+  // Cleanup tooltip timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutId) {
+        clearTimeout(tooltipTimeoutId);
+      }
+    };
+  }, [tooltipTimeoutId]);
 
   // Load versions when user is authenticated (only run once when user ID is available)
   useEffect(() => {
@@ -371,23 +443,26 @@ export default function WritingCanvasPage() {
     }
   };
 
-  const handleMainContentChange = (newContent: TiptapDocument) => {
+  const handleMainContentChange = React.useCallback((newContent: TiptapDocument) => {
     setMainDocumentContent(newContent);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newContent));
-  };
+  }, []);
 
   const handleOpenVersionForReview = (version: Version) => {
     setSelectedReviewVersion(version);
     setIsReviewing(true);
+    setShowCommentMargin(true);
     setIsSideMenuOpen(false);
-    // Reset diff mode when opening a new version
-    setDiffMode(false);
   };
 
   const handleCloseReview = () => {
     setIsReviewing(false);
     setSelectedReviewVersion(null);
-    setDiffMode(false);
+    // Keep comment margin open when closing reference document
+  };
+
+  const handleCloseCommentMargin = () => {
+    setShowCommentMargin(false);
   };
 
   // NEW: Handle merging segments from diff view
@@ -403,15 +478,57 @@ export default function WritingCanvasPage() {
     
     // Show success message
     alert(`Merged ${selectedSegmentIds.length} segments successfully!`);
-    
-    // Optionally close diff mode after merge
-    setDiffMode(false);
   };
 
   // Add this handler function after your other handler functions
-  const handleTextSelection = (text: string) => {
+  const handleTextSelection = React.useCallback((text: string) => {
     setSelectedText(text);
-  };
+    
+    // Clear any existing tooltip timeout
+    if (tooltipTimeoutId) {
+      clearTimeout(tooltipTimeoutId);
+      setTooltipTimeoutId(null);
+    }
+    
+    // Show comment tooltip if text is selected
+    if (text.trim() && mainEditorRef.current) {
+      const editor = mainEditorRef.current;
+      const { from, to } = editor.state.selection;
+      
+      if (from !== to) {
+        setCommentSelectedText(text);
+        setCommentTextRange({ from, to });
+        
+        // Calculate position for comment tooltip
+        const selection = window.getSelection();
+        
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          const selectionRect = range.getBoundingClientRect();
+          
+          setCommentTooltipPosition({
+            x: selectionRect.left + (selectionRect.width / 2),
+            y: selectionRect.top
+          });
+          
+          setShowCommentTooltip(true);
+          
+          // Auto-hide tooltip after 5 seconds if not used
+          const timeoutId = setTimeout(() => {
+            setShowCommentTooltip(false);
+            setCommentTooltipPosition(null);
+            setCommentSelectedText('');
+            setCommentTextRange(null);
+          }, 5000);
+          setTooltipTimeoutId(timeoutId);
+        }
+      }
+    } else {
+      // Clear tooltip when no text is selected
+      setShowCommentTooltip(false);
+      setCommentTooltipPosition(null);
+    }
+  }, [tooltipTimeoutId]);
 
   // Helper: find range of the first occurrence of text in the document
   const findTextRange = (editor: Editor, searchText: string): { from: number; to: number } | null => {
@@ -459,6 +576,148 @@ export default function WritingCanvasPage() {
       alert('Unable to locate the specified text in the document.');
     }
   };
+
+  // Comment handling functions
+  const handleAddComment = () => {
+    if (!currentUser || !commentTextRange) return;
+    
+    // Clear tooltip timeout since user is using it
+    if (tooltipTimeoutId) {
+      clearTimeout(tooltipTimeoutId);
+      setTooltipTimeoutId(null);
+    }
+    
+    // Create inline comment data and show comment margin
+    setInlineCommentData({
+      selectedText: commentSelectedText,
+      authorName: currentUser.name || 'Unknown User',
+      authorEmail: currentUser.email || '',
+      position: commentTextRange
+    });
+    
+    // Show comment margin if not already shown
+    if (!showCommentMargin) {
+      setShowCommentMargin(true);
+    }
+    
+    // Hide tooltip
+    setShowCommentTooltip(false);
+    setCommentTooltipPosition(null);
+  };
+
+  const handleSaveInlineComment = (commentText: string) => {
+    if (!inlineCommentData) return;
+    
+    const newComment: UserComment = {
+      id: `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      text: commentText,
+      selectedText: inlineCommentData.selectedText,
+      authorName: inlineCommentData.authorName,
+      authorEmail: inlineCommentData.authorEmail,
+      createdAt: new Date(),
+      resolved: false,
+      position: inlineCommentData.position
+    };
+    
+    setUserComments(prev => [...prev, newComment]);
+    setInlineCommentData(null);
+    setCommentSelectedText('');
+    setCommentTextRange(null);
+  };
+
+  const handleCancelInlineComment = () => {
+    setInlineCommentData(null);
+    setCommentSelectedText('');
+    setCommentTextRange(null);
+  };
+
+  const handleCloseCommentTooltip = () => {
+    setShowCommentTooltip(false);
+    setCommentTooltipPosition(null);
+    setCommentSelectedText('');
+    setCommentTextRange(null);
+  };
+
+  const handleResolveComment = React.useCallback((commentId: string) => {
+    setUserComments(prev => 
+      prev.map(comment => 
+        comment.id === commentId 
+          ? { ...comment, resolved: true }
+          : comment
+      )
+    );
+  }, []);
+
+  const handleDeleteComment = React.useCallback((commentId: string) => {
+    setUserComments(prev => prev.filter(comment => comment.id !== commentId));
+    // Clear active comment if it's being deleted
+    setActiveCommentId(prevActive => prevActive === commentId ? null : prevActive);
+  }, []);
+
+  const handleEditComment = React.useCallback((commentId: string, newText: string) => {
+    setUserComments(prev => 
+      prev.map(comment => 
+        comment.id === commentId 
+          ? { ...comment, text: newText }
+          : comment
+      )
+    );
+  }, []);
+
+  const handleCommentClick = React.useCallback((commentId: string) => {
+    setActiveCommentId(prevActive => prevActive === commentId ? null : commentId);
+  }, []);
+
+  // Clear all comments and highlights
+  const handleClearAllComments = React.useCallback(() => {
+    // Clear all user comments
+    setUserComments([]);
+    
+    // Clear localStorage
+    localStorage.removeItem(COMMENTS_STORAGE_KEY);
+    
+    // Clear highlights from editor
+    if (mainEditorRef.current) {
+      try {
+        const editor = mainEditorRef.current;
+        const { from, to } = editor.state.selection;
+        const docSize = editor.state.doc.content.size;
+        
+        // Force clear all comment highlights and regular highlights from entire document
+        if (docSize > 0) {
+          editor.chain()
+            .setTextSelection({ from: 0, to: docSize })
+            .unsetMark('commentHighlight')
+            .unsetHighlight()
+            .setTextSelection({ from, to })
+            .run();
+        }
+        
+        // Also use the extension commands as backup
+        editor.commands.unsetCommentHighlight();
+        editor.commands.unsetHighlight();
+      } catch (error) {
+        console.warn('Error clearing highlights:', error);
+      }
+    }
+    
+    // Hide comment margin
+    setShowCommentMargin(false);
+    
+    // Clear any active comment state
+    setActiveCommentId(null);
+    setInlineCommentData(null);
+    setCommentSelectedText('');
+    setCommentTextRange(null);
+    setShowCommentTooltip(false);
+    setCommentTooltipPosition(null);
+    
+    console.log('All comments and highlights cleared');
+  }, []);
+
+  const handleRegenerateComments = useCallback(() => {
+    console.log('Regenerating AI insights...');
+  }, []);
 
   const handleTitleSave = async () => {
     setIsEditingTitle(false);
@@ -534,8 +793,19 @@ export default function WritingCanvasPage() {
 
   const mainContentForEditor = mainDocumentContent;
 
+  // Determine layout class based on what's shown
+  const getLayoutClass = () => {
+    const hasComments = showCommentMargin; // Comments can be shown independently
+    const hasReference = isReviewing && selectedReviewVersion;
+    
+    if (hasComments && hasReference) return 'both-panels';
+    if (hasComments && !hasReference) return 'comment-only';
+    if (!hasComments && hasReference) return 'reference-only';
+    return '';
+  };
+
   return (
-    <main style={{ padding: '20px' }} className={`writing-canvas-page ${isReviewing ? 'is-reviewing' : ''} ${isSideMenuOpen ? 'side-menu-open' : ''}`}>
+    <main style={{ padding: '20px' }} className={`writing-canvas-page ${getLayoutClass() ? 'is-reviewing' : ''} ${isSideMenuOpen ? 'side-menu-open' : ''}`}>
       <div className="canvas-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div className="title-editor-section" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {isEditingTitle ? (
@@ -615,8 +885,11 @@ export default function WritingCanvasPage() {
           >
             {isSavingVersion ? 'Locking Version...' : 'Save Main Document'}
           </button>
-          <button onClick={() => setAIToolOpen(!isAIToolOpen)} className="versions-button">
+          {/* <button onClick={() => setAIToolOpen(!isAIToolOpen)} className="versions-button">
             {isAIToolOpen ? 'Close AI Toolbox' : 'AI Toolbox'}
+          </button> */}
+          <button onClick={() => setShowCommentMargin(!showCommentMargin)} className="versions-button">
+            {showCommentMargin ? 'Hide Comments' : 'Show Comments'}
           </button>
           <button onClick={() => setIsSideMenuOpen(!isSideMenuOpen)} className="versions-button">
             {isSideMenuOpen ? 'Close Versions' : 'Compare Versions'}
@@ -667,10 +940,10 @@ export default function WritingCanvasPage() {
             <div className="versions-info-card">
               <h4>How to Compare & Diff:</h4>
               <p>
-                <strong>Double-click</strong> on any version below to open it for comparison with your current writing.
+                <strong>Double-click</strong> on any version below to open it for side-by-side comparison with your current writing.
               </p>
               <p>
-                Then click <strong>"Review & Merge"</strong> to see changes and selectively merge content.
+                You'll see comparison insights in the shared margin between documents.
               </p>
               <p>
                 <strong>🔒 Saved Versions:</strong> Locked snapshots of your work.<br/>
@@ -780,7 +1053,7 @@ export default function WritingCanvasPage() {
         </div>
       )}
 
-      <div className={`editor-wrapper ${isReviewing ? 'review-mode' : 'single-mode'} ${isAIToolOpen ? 'ai-tool-open' : ''}`}>
+      <div className={`editor-wrapper ${getLayoutClass() ? 'review-mode' : 'single-mode'} ${getLayoutClass()} ${isAIToolOpen ? 'ai-tool-open' : ''}`}>
         <div className={`main-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
           <TiptapEditor 
             initialContent={mainContentForEditor}
@@ -788,44 +1061,111 @@ export default function WritingCanvasPage() {
             onTextSelection={handleTextSelection}
             isEditable={true}
             editorRef={mainEditorRef}
+            userComments={userComments}
+            onCommentClick={handleCommentClick}
+            temporaryHighlight={inlineCommentData?.position || (showCommentTooltip ? commentTextRange : null)}
           />
         </div>
-        {/* UPDATED: Enhanced review editor with diff functionality */}
+        {/* NEW: Comment Cards Column - can be shown independently */}
+        {showCommentMargin && (
+          <div className="comment-cards-column">
+            <div className="margin-header">
+              <h4>{selectedReviewVersion ? 'Comments & Insights' : 'Comments'}</h4>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button 
+                  onClick={handleRegenerateComments}
+                  className="regenerate-button"
+                  style={{
+                    background: '#6f42c1',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.65rem',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#5a32a3';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#6f42c1';
+                  }}
+                  title="Generate new AI insights"
+                >
+                  🔄 Regenerate
+                </button>
+                <button 
+                  onClick={handleCloseCommentMargin} 
+                  className="close-margin-button"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    opacity: '0.6',
+                    padding: '2px'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <CommentCards
+              originalContent={mainDocumentContent}
+              comparisonContent={selectedReviewVersion?.content || defaultInitialMainDocContent}
+              onHighlightText={highlightTextInMainEditor}
+              mainDocId={mainDocumentId || undefined}
+              refDocId={selectedReviewVersion?.id}
+              userComments={userComments}
+              onResolveComment={handleResolveComment}
+              onDeleteComment={handleDeleteComment}
+              onEditComment={handleEditComment}
+              inlineCommentData={inlineCommentData}
+              onSaveInlineComment={handleSaveInlineComment}
+              onCancelInlineComment={handleCancelInlineComment}
+              activeCommentId={activeCommentId}
+              onCommentClick={handleCommentClick}
+              onRegenerateComments={handleRegenerateComments}
+            />
+          </div>
+        )}
+        
+        {/* Right Column: Reference Document - can be shown independently */}
         {isReviewing && selectedReviewVersion && (
-          <div className={`review-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
+          <div className={`reference-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
             <div className="review-header">
-              <h4 style={{ margin: 0, color: '#495057', fontSize: '1rem' }}>
+              <h4 style={{ margin: 0, marginLeft: '8px', color: '#495057', fontSize: '0.8rem' }}>
                 Comparing with: <span style={{ fontWeight: 600, color: '#007bff' }}>{selectedReviewVersion.name}</span>
               </h4>
               <div className="review-buttons">
                 <button 
-                  onClick={() => setDiffMode(!diffMode)} 
-                  className={`diff-mode-button ${diffMode ? 'diff-view' : 'normal-view'}`}
+                  onClick={handleCloseReview} 
+                  className="close-margin-button"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    opacity: '0.6',
+                    padding: '2px 8px'
+                  }}
                 >
-                  {diffMode ? 'View Document' : 'Review & Merge'}
-                </button>
-                <button onClick={handleCloseReview} className="close-review-button">
-                  Close Review
+                  ✕
                 </button>
               </div>
             </div>
-            {diffMode ? (
-              <DiffTiptapEditor 
-                originalContent={mainDocumentContent}
-                comparisonContent={selectedReviewVersion.content}
-                onMergeSegments={handleMergeSegments}
-                onHighlightText={highlightTextInMainEditor}
-                mainDocId={mainDocumentId || undefined}
-                refDocId={selectedReviewVersion.id}
-              />
-            ) : (
-              <TiptapEditor 
-                key={selectedReviewVersion.id}
-                initialContent={selectedReviewVersion.content}
-                onContentChange={() => {}}
-                isEditable={false}
-              />
-            )}
+            <DiffTiptapEditor 
+              originalContent={mainDocumentContent}
+              comparisonContent={selectedReviewVersion.content}
+              onMergeSegments={handleMergeSegments}
+              onHighlightText={highlightTextInMainEditor}
+              mainDocId={mainDocumentId || undefined}
+              refDocId={selectedReviewVersion.id}
+            />
           </div>
         )}
         {/* UPDATED: Enhanced AI Tool */}
@@ -842,6 +1182,15 @@ export default function WritingCanvasPage() {
           />
         )}
       </div>
+      
+      {/* Comment Tooltip */}
+      {showCommentTooltip && (
+        <CommentTooltip
+          position={commentTooltipPosition}
+          onAddComment={handleAddComment}
+          onClose={handleCloseCommentTooltip}
+        />
+      )}
       
     </main>
   );
