@@ -6,7 +6,7 @@ import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { TiptapDocument } from '@/types/tiptap';
 
-// GET /api/versions - Get all versions (both locked main documents and named versions)
+// GET /api/versions - Get branch versions (named versions only, excluding main document versions)
 export async function GET() {
   try {
     const headersList = await headers();
@@ -18,53 +18,27 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get locked main documents (saved versions)
-    const lockedMainDocs = await db
-      .select()
-      .from(mainDocuments)
-      .where(and(
-        eq(mainDocuments.userId, session.user.id),
-        eq(mainDocuments.isLocked, true)
-      ))
-      .orderBy(desc(mainDocuments.createdAt));
-
-    // Get named document versions
+    // Get named document versions (branch versions only - excluding main versions)
     const namedVersions = await db
       .select()
       .from(documentVersions)
       .where(eq(documentVersions.userId, session.user.id))
       .orderBy(desc(documentVersions.createdAt));
 
-    // Combine and format all versions
-    const allVersions = [
-      // Locked main documents (saved versions) - these don't have merge status
-      ...lockedMainDocs.map(doc => ({
-        id: doc.id,
-        name: `Saved Version: ${doc.title}`,
-        timestamp: doc.createdAt.toLocaleDateString(),
-        content: doc.content as TiptapDocument,
-        type: 'saved_version' as const,
-        createdAt: doc.createdAt.toISOString(),
-        merged: false, // Saved versions don't have merge functionality
-      })),
-      // Named versions - include merge status and notes
-      ...namedVersions.map(version => ({
-        id: version.id,
-        name: version.name,
-        timestamp: version.createdAt.toLocaleDateString(),
-        content: version.content as TiptapDocument,
-        type: 'named_version' as const,
-        createdAt: version.createdAt.toISOString(),
-        merged: version.merged || false, // Include merge status from database
-        discussionNotes: version.discussionNotes || '', // Include discussion notes
-        prepNotes: version.prepNotes || '', // Include prep notes
-      }))
-    ];
+    // Format only named versions (branch versions)
+    const branchVersions = namedVersions.map(version => ({
+      id: version.id,
+      name: version.name,
+      timestamp: version.createdAt.toLocaleDateString(),
+      content: version.content as TiptapDocument,
+      type: 'named_version' as const,
+      createdAt: version.createdAt.toISOString(),
+      merged: version.merged || false, // Include merge status from database
+      discussionNotes: version.discussionNotes || '', // Include discussion notes
+      prepNotes: version.prepNotes || '', // Include prep notes
+    }));
 
-    // Sort all versions by creation date (newest first)
-    allVersions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return NextResponse.json(allVersions);
+    return NextResponse.json(branchVersions);
   } catch (error) {
     console.error('Error fetching versions:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -62,7 +62,7 @@ export default function WritingCanvasPage() {
   const [selectedReviewVersion, setSelectedReviewVersion] = useState<Version | null>(null);
   const [isReviewing, setIsReviewing] = useState<boolean>(false);
   const [showCommentMargin, setShowCommentMargin] = useState<boolean>(false);
-  const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
+  const [isVersionDropdownOpen, setIsVersionDropdownOpen] = useState<boolean>(false);
   const [isAIToolOpen, setAIToolOpen] = useState<boolean>(false);
   const [versions, setVersions] = useState<Version[]>([]);
   const [isLoadingVersions, setIsLoadingVersions] = useState<boolean>(false);
@@ -71,8 +71,7 @@ export default function WritingCanvasPage() {
   // Add this state variable with your other useState declarations (around line 48)
   const [selectedText, setSelectedText] = useState<string>('');
 
-  // NEW: Add state for toggleable info card
-  const [showVersionsInfo, setShowVersionsInfo] = useState<boolean>(false);
+
 
   // NEW: Add state for reference panel view mode
   const [referenceViewMode, setReferenceViewMode] = useState<'content' | 'discussion_notes'>('discussion_notes');
@@ -149,14 +148,23 @@ export default function WritingCanvasPage() {
     }
   }, [userComments]);
 
-  // Close tooltip when clicking outside
+  // Close tooltip and dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      // Close comment tooltip
       if (showCommentTooltip) {
-        const target = event.target as HTMLElement;
         if (!target.closest('.comment-tooltip') && !target.closest('.ProseMirror')) {
           setShowCommentTooltip(false);
           setCommentTooltipPosition(null);
+        }
+      }
+      
+      // Close version dropdown
+      if (isVersionDropdownOpen) {
+        if (!target.closest('[data-dropdown-container]')) {
+          setIsVersionDropdownOpen(false);
         }
       }
     };
@@ -165,7 +173,7 @@ export default function WritingCanvasPage() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showCommentTooltip]);
+  }, [showCommentTooltip, isVersionDropdownOpen]);
 
   // Cleanup tooltip timeout on unmount
   useEffect(() => {
@@ -457,7 +465,7 @@ export default function WritingCanvasPage() {
     setSelectedReviewVersion(version);
     setIsReviewing(true);
     setShowCommentMargin(true);
-    setIsSideMenuOpen(false);
+    setIsVersionDropdownOpen(false);
     setReferenceViewMode('discussion_notes'); // Reset to discussion notes view when opening a new version
   };
 
@@ -864,7 +872,7 @@ export default function WritingCanvasPage() {
   };
 
   return (
-    <main style={{ padding: '20px' }} className={`writing-canvas-page ${getLayoutClass() ? 'is-reviewing' : ''} ${isSideMenuOpen ? 'side-menu-open' : ''}`}>
+    <main style={{ padding: '20px' }} className={`writing-canvas-page ${getLayoutClass() ? 'is-reviewing' : ''}`}>
       <div className="canvas-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <div className="title-editor-section" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {isEditingTitle ? (
@@ -956,167 +964,103 @@ export default function WritingCanvasPage() {
           <button onClick={() => setShowCommentMargin(!showCommentMargin)} className="versions-button">
             {showCommentMargin ? 'Hide Comments' : 'Show Comments'}
           </button>
-          <button onClick={() => setIsSideMenuOpen(!isSideMenuOpen)} className="versions-button">
-            {isSideMenuOpen ? 'Close Versions' : 'Compare Versions'}
-          </button>
+          {/* Version Dropdown */}
+          <div style={{ position: 'relative' }} data-dropdown-container>
+            <button 
+              onClick={() => setIsVersionDropdownOpen(!isVersionDropdownOpen)} 
+              className="versions-button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                minWidth: '180px',
+                gap: '8px'
+              }}
+            >
+              <span>{selectedReviewVersion ? selectedReviewVersion.name : 'Compare Versions'}</span>
+              <span style={{ fontSize: '0.8rem' }}>{isVersionDropdownOpen ? '▲' : '▼'}</span>
+            </button>
+            
+            {isVersionDropdownOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                backgroundColor: 'white',
+                border: '1px solid #000',
+                zIndex: 1000,
+                maxHeight: '300px',
+                overflowY: 'auto'
+              }}>
+                {isLoadingVersions ? (
+                  <div style={{ 
+                    padding: '12px', 
+                    fontSize: '0.9rem',
+                    color: '#666' 
+                  }}>
+                    Loading versions...
+                  </div>
+                ) : versions.length === 0 ? (
+                  <div style={{ 
+                    padding: '12px', 
+                    fontSize: '0.9rem',
+                    color: '#666',
+                    fontStyle: 'italic' 
+                  }}>
+                    No versions saved yet
+                  </div>
+                ) : (
+                  versions.map((version, index) => (
+                    <div
+                      key={version.id}
+                      onClick={() => handleOpenVersionForReview(version)}
+                      style={{
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        borderBottom: index < versions.length - 1 ? '1px solid #666' : 'none',
+                        fontSize: '0.9rem',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        opacity: version.merged ? 0.6 : 1,
+                        backgroundColor: selectedReviewVersion?.id === version.id ? '#f0f8ff' : 'white'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedReviewVersion?.id !== version.id) {
+                          e.currentTarget.style.backgroundColor = '#f8f8f8';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedReviewVersion?.id !== version.id) {
+                          e.currentTarget.style.backgroundColor = 'white';
+                        }
+                      }}
+                    >
+                      <span style={{ 
+                        color: version.merged ? '#999' : '#000',
+                        fontWeight: selectedReviewVersion?.id === version.id ? '600' : 'normal'
+                      }}>
+                        {version.name}
+                        {version.merged && <span style={{ fontSize: '0.7rem', marginLeft: '4px' }}>(merged)</span>}
+                      </span>
+                      <span style={{ 
+                        fontSize: '0.75rem', 
+                        color: '#666' 
+                      }}>
+                        {version.timestamp}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       {/* <p>Welcome, {currentUser.name || currentUser.email}!</p> */}
 
-      {isSideMenuOpen && (
-        <div className="versions-side-menu">
-          <div className="versions-header">
-            <h2 style={{ fontSize: '1rem', fontWeight: 'normal', margin: '0 0 10px 0' }}>Previous Versions</h2>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                onClick={() => setShowVersionsInfo(!showVersionsInfo)}
-                className="info-toggle-button"
-                title="Show help"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                  opacity: '0.6',
-                  padding: '2px'
-                }}
-              >
-                ℹ️
-              </button>
-              <button 
-                onClick={() => setIsSideMenuOpen(false)} 
-                className="side-menu-close-button"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                  opacity: '0.6',
-                  padding: '2px'
-                }}
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-          
-          {/* NEW: Toggleable UX Hint Card */}
-          {showVersionsInfo && (
-            <div className="versions-info-card">
-              <h4>How to Compare & Diff:</h4>
-              <p>
-                <strong>Double-click</strong> on any version below to open it for side-by-side comparison with your current writing.
-              </p>
-              <p>
-                You'll see comparison insights in the shared margin between documents.
-              </p>
-              <p>
-                <strong>🔒 Saved Versions:</strong> Locked snapshots of your work.<br/>
-                <strong>📝 Named Versions:</strong> Custom versions for specific audiences.
-              </p>
-            </div>
-          )}
 
-          {isLoadingVersions ? (
-            <p>Loading versions...</p>
-          ) : (
-            <ul>
-              {versions.length === 0 ? (
-                <li style={{ padding: '10px', fontStyle: 'italic' }}>No versions saved yet</li>
-              ) : (
-                versions.map(version => (
-                  <li key={version.id} style={{ marginBottom: '8px' }}>
-                    <div 
-                      onDoubleClick={() => handleOpenVersionForReview(version)} 
-                      style={{ 
-                        cursor: 'pointer', 
-                        padding: '8px', 
-                        border: '1px solid #ddd', 
-                        borderRadius: '4px',
-                        opacity: version.merged ? 0.6 : 1,
-                        backgroundColor: version.merged ? '#f5f5f5' : 'white',
-                        filter: version.merged ? 'grayscale(60%)' : 'none',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="version-card"
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '0.8rem', marginRight: '6px' }}>
-                          {version.type === 'saved_version' ? '🔒' : '📝'}
-                        </span>
-                        <strong style={{ 
-                          fontSize: '0.9rem',
-                          color: version.merged ? '#666' : 'inherit'
-                        }}>
-                          {version.name}
-                          {version.merged && <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: '#999' }}>(merged)</span>}
-                        </strong>
-                        {version.type === 'saved_version' && (
-                          <span style={{
-                            marginLeft: '8px',
-                            fontSize: '0.65rem',
-                            padding: '2px 6px',
-                            backgroundColor: '#f8f9fa',
-                            color: '#000',
-                            border: '1px solid #000',
-                            borderRadius: '3px',
-                            fontWeight: 'normal'
-                          }}>
-                            Main
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: version.merged ? '#999' : '#666' }}>
-                        {version.timestamp}
-                      </div>
-                    </div>
-                    <div className="version-buttons" style={{ 
-                      marginTop: '4px', 
-                      display: 'flex', 
-                      gap: '4px',
-                      opacity: 0,
-                      transition: 'opacity 0.2s ease'
-                    }}>
-                      {/* Only show merge button for named versions, not saved versions */}
-                      {version.type === 'named_version' && (
-                        <button 
-                          onClick={() => toggleMergeStatus(version.id, version.merged || false)}
-                          className="merge-version-button"
-                          style={{ 
-                            fontSize: '0.7rem',
-                            padding: '2px 8px',
-                            backgroundColor: '#ffffff',
-                            color: '#000',
-                            border: '1px solid #000',
-                            borderRadius: '3px',
-                            cursor: 'pointer'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f0f8f0';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor = '#ffffff';
-                          }}
-                          title={version.merged ? 'Reopen this version' : 'Mark as merged'}
-                        >
-                          {version.merged ? 'Reopen' : 'Merge'}
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => deleteVersion(version.id)}
-                        className="delete-version-button"
-                        style={{ fontSize: '0.7rem' }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </div>
-      )}
 
       <div className={`editor-wrapper ${getLayoutClass() ? 'review-mode' : 'single-mode'} ${getLayoutClass()} ${isAIToolOpen ? 'ai-tool-open' : ''}`}>
         <div className={`main-editor-container ${isAIToolOpen ? 'tiptap-editor-container-tool-open':'tiptap-editor-container'}`}>
