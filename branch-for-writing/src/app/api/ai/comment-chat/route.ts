@@ -125,7 +125,7 @@ SPECIFIC PASSAGES:
 ${aiCommentData.evidence?.map((e: any) => `"${e.text}"`).join('\n') || 'None'}
 
 HOW TO RESPOND:
-- Under 50 words
+- Under 100 words
 - Short sentences
 - Use their writing style and vocabulary
 - Quote their exact words when relevant
@@ -171,8 +171,8 @@ HOW TO RESPOND:
 
     // Ensure response is under 50 words
     const words = content.trim().split(/\s+/);
-    if (words.length > 50) {
-      return words.slice(0, 50).join(' ') + '...';
+    if (words.length > 100) {
+      return words.slice(0, 100).join(' ') + '...';
     }
 
     return content.trim();

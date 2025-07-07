@@ -143,7 +143,7 @@ For each insight, identify whether the discussion notes:
       "id": "insight-1",
       "type": "overlapping|conflicting|unique",
       "insight": "Brief insight about how discussion notes relate to main document (1-2 sentences)",
-      "socraticPrompt": "Thought-provoking question to help integrate the supporter's perspective",
+      "socraticPrompt": "Thought-provoking question to help integrate the supporter's perspective. It can be Mini synthesis prompt (“You’ve introduced both care and freedom here—want to write a sentence holding both?”) or Reflection hook (“Does this feel more true to how you want to be seen?”)",
       "evidence": [
         {
           "id": "ev-1",
@@ -164,7 +164,7 @@ Guidelines:
 - Look for interesting, under-explored possibilities and signs.
 - Keep insights close to the actual content, avoid generic advice
 - Include up to 4 evidence quotes per insight from the main document
-- Make socratic prompts specific and actionable and under 12 words`;
+- Make socratic prompts specific and actionable and under 12 words. Socratic questions **Mini synthesis prompt (“You’ve introduced both care and freedom here—want to write a sentence holding both?”) or Reflection hook (“Does this feel more true to how you want to be seen?”)`;
 
   try {
     const response = await openai.chat.completions.create({
