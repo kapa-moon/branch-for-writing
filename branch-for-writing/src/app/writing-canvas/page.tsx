@@ -40,6 +40,8 @@ interface Version {
   type?: 'saved_version' | 'named_version'; // NEW: Add type field
   createdAt?: string; // NEW: Add createdAt field
   merged?: boolean; // NEW: Add merged field
+  discussionNotes?: string; // NEW: Add discussion notes field
+  prepNotes?: string; // NEW: Add prep notes field
 }
 
 export default function WritingCanvasPage() {
@@ -71,6 +73,9 @@ export default function WritingCanvasPage() {
 
   // NEW: Add state for toggleable info card
   const [showVersionsInfo, setShowVersionsInfo] = useState<boolean>(false);
+
+  // NEW: Add state for reference panel view mode
+  const [referenceViewMode, setReferenceViewMode] = useState<'content' | 'discussion_notes'>('discussion_notes');
 
   // Article title state
   const [articleTitle, setArticleTitle] = useState<string>('Untitled Article');
@@ -453,6 +458,7 @@ export default function WritingCanvasPage() {
     setIsReviewing(true);
     setShowCommentMargin(true);
     setIsSideMenuOpen(false);
+    setReferenceViewMode('discussion_notes'); // Reset to discussion notes view when opening a new version
   };
 
   const handleCloseReview = () => {
@@ -532,24 +538,62 @@ export default function WritingCanvasPage() {
 
   // Helper: find range of the first occurrence of text in the document
   const findTextRange = (editor: Editor, searchText: string): { from: number; to: number } | null => {
-    const lowerSearch = searchText.toLowerCase();
+    const searchNormalized = searchText.toLowerCase().trim();
     let foundFrom: number | null = null;
     let foundTo: number | null = null;
+    let currentText = '';
+    let currentPos = 0;
 
-    // Using `any` for node to avoid deep ProseMirror typings here
+    // Build a continuous text string with position mapping
+    const textChunks: Array<{ text: string; startPos: number }> = [];
+    
     editor.state.doc.descendants((node: any, pos: number) => {
-      if (foundFrom !== null) return false; // stop
       if (node.isText) {
-        const text = (node.text || '').toLowerCase();
-        const index = text.indexOf(lowerSearch);
-        if (index !== -1) {
-          foundFrom = pos + index;
-          foundTo = (foundFrom as number) + searchText.length;
-          return false;
+        const text = node.text || '';
+        if (text.trim().length > 0) {
+          textChunks.push({ text: text.toLowerCase(), startPos: pos });
+          currentText += text.toLowerCase();
         }
       }
       return true;
     });
+
+    // Try exact match first
+    let searchIndex = currentText.indexOf(searchNormalized);
+    
+    // If exact match fails, try fuzzy matching with normalized spaces
+    if (searchIndex === -1) {
+      const normalizedCurrentText = currentText.replace(/\s+/g, ' ');
+      const normalizedSearchText = searchNormalized.replace(/\s+/g, ' ');
+      searchIndex = normalizedCurrentText.indexOf(normalizedSearchText);
+    }
+    
+    // If still no match, try word-by-word matching
+    if (searchIndex === -1) {
+      const searchWords = searchNormalized.split(/\s+/).filter(word => word.length > 0);
+      if (searchWords.length > 0) {
+        const firstWord = searchWords[0];
+        const firstWordIndex = currentText.indexOf(firstWord);
+        if (firstWordIndex !== -1) {
+          searchIndex = firstWordIndex;
+          // Use the length of the search text for the range
+        }
+      }
+    }
+
+    if (searchIndex !== -1) {
+      // Map back to document positions
+      let charCount = 0;
+      for (const chunk of textChunks) {
+        if (charCount + chunk.text.length > searchIndex) {
+          const offsetInChunk = searchIndex - charCount;
+          foundFrom = chunk.startPos + offsetInChunk;
+          foundTo = foundFrom + searchText.length;
+          break;
+        }
+        charCount += chunk.text.length;
+      }
+    }
 
     return foundFrom !== null && foundTo !== null ? { from: foundFrom as number, to: foundTo as number } : null;
   };
@@ -558,10 +602,27 @@ export default function WritingCanvasPage() {
     const editor = mainEditorRef.current;
     if (!editor) return;
 
-    // Remove existing highlight (optional):
-    // editor.commands.selectAll();
-    // editor.commands.unsetHighlight();
+    // If text is empty, clear all highlights
+    if (!text || text.trim() === '') {
+      try {
+        const { from, to } = editor.state.selection;
+        const docSize = editor.state.doc.content.size;
+        
+        // Clear all highlights from entire document
+        if (docSize > 0) {
+          editor.chain()
+            .setTextSelection({ from: 0, to: docSize })
+            .unsetHighlight()
+            .setTextSelection({ from, to })
+            .run();
+        }
+      } catch (error) {
+        console.warn('Error clearing highlights:', error);
+      }
+      return;
+    }
 
+    // Find and highlight the text
     const range = findTextRange(editor, text);
     if (range) {
       // @ts-ignore - highlight commands may not be typed in Editor chain helpers
@@ -573,7 +634,7 @@ export default function WritingCanvasPage() {
         .scrollIntoView()
         .run();
     } else {
-      alert('Unable to locate the specified text in the document.');
+      console.warn('Unable to locate the specified text in the document:', text);
     }
   };
 
@@ -715,9 +776,7 @@ export default function WritingCanvasPage() {
     console.log('All comments and highlights cleared');
   }, []);
 
-  const handleRegenerateComments = useCallback(() => {
-    console.log('Regenerating AI insights...');
-  }, []);
+
 
   const handleTitleSave = async () => {
     setIsEditingTitle(false);
@@ -842,6 +901,12 @@ export default function WritingCanvasPage() {
                   border: '1px solid #000',
                   borderRadius: '4px',
                   cursor: 'pointer'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#e9e9e9';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
                 }}
               >
                 Edit Title
@@ -1073,32 +1138,6 @@ export default function WritingCanvasPage() {
               <h4>{selectedReviewVersion ? 'Comments & Insights' : 'Comments'}</h4>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button 
-                  onClick={handleRegenerateComments}
-                  className="regenerate-button"
-                  style={{
-                    background: '#6f42c1',
-                    border: 'none',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '0.65rem',
-                    padding: '2px 6px',
-                    borderRadius: '3px',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '2px'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#5a32a3';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#6f42c1';
-                  }}
-                  title="Generate new AI insights"
-                >
-                  🔄 Regenerate
-                </button>
-                <button 
                   onClick={handleCloseCommentMargin} 
                   className="close-margin-button"
                   style={{
@@ -1120,6 +1159,7 @@ export default function WritingCanvasPage() {
               onHighlightText={highlightTextInMainEditor}
               mainDocId={mainDocumentId || undefined}
               refDocId={selectedReviewVersion?.id}
+              discussionNotes={selectedReviewVersion?.discussionNotes}
               userComments={userComments}
               onResolveComment={handleResolveComment}
               onDeleteComment={handleDeleteComment}
@@ -1129,7 +1169,7 @@ export default function WritingCanvasPage() {
               onCancelInlineComment={handleCancelInlineComment}
               activeCommentId={activeCommentId}
               onCommentClick={handleCommentClick}
-              onRegenerateComments={handleRegenerateComments}
+
             />
           </div>
         )}
@@ -1158,14 +1198,101 @@ export default function WritingCanvasPage() {
                 </button>
               </div>
             </div>
-            <DiffTiptapEditor 
-              originalContent={mainDocumentContent}
-              comparisonContent={selectedReviewVersion.content}
-              onMergeSegments={handleMergeSegments}
-              onHighlightText={highlightTextInMainEditor}
-              mainDocId={mainDocumentId || undefined}
-              refDocId={selectedReviewVersion.id}
-            />
+            
+            {/* NEW: Toggle buttons for content vs discussion notes */}
+            <div className="reference-toggle-buttons">
+              <button
+                onClick={() => setReferenceViewMode('content')}
+                className={`reference-toggle-button ${referenceViewMode === 'content' ? 'active' : ''}`}
+              >
+                Article Content
+              </button>
+              <button
+                onClick={() => setReferenceViewMode('discussion_notes')}
+                className={`reference-toggle-button ${referenceViewMode === 'discussion_notes' ? 'active' : ''}`}
+                disabled={!selectedReviewVersion.discussionNotes || selectedReviewVersion.discussionNotes.trim() === ''}
+                title={!selectedReviewVersion.discussionNotes || selectedReviewVersion.discussionNotes.trim() === '' ? 'No discussion notes for this version' : 'View discussion notes'}
+              >
+                Discussion Notes
+              </button>
+            </div>
+
+            {/* Conditional rendering based on view mode */}
+            {referenceViewMode === 'content' ? (
+              <DiffTiptapEditor 
+                originalContent={mainDocumentContent}
+                comparisonContent={selectedReviewVersion.content}
+                onMergeSegments={handleMergeSegments}
+                onHighlightText={highlightTextInMainEditor}
+                mainDocId={mainDocumentId || undefined}
+                refDocId={selectedReviewVersion.id}
+              />
+            ) : (
+              <div className="discussion-notes-container">
+                {selectedReviewVersion.discussionNotes && selectedReviewVersion.discussionNotes.trim() !== '' ? (
+                  <div className="discussion-notes-paragraphs">
+                    {selectedReviewVersion.discussionNotes
+                      .split('\n\n')
+                      .filter(paragraph => paragraph.trim() !== '')
+                      .map((paragraph, index) => (
+                        <div 
+                          key={index}
+                          className="discussion-note-card"
+                          onClick={() => {
+                            navigator.clipboard.writeText(paragraph.trim());
+                            // Show brief feedback
+                            const card = document.querySelectorAll('.discussion-note-card')[index] as HTMLElement;
+                            if (card) {
+                              const originalBg = card.style.backgroundColor;
+                              card.style.backgroundColor = '#e8f5e8';
+                              setTimeout(() => {
+                                card.style.backgroundColor = originalBg;
+                              }, 200);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e0e0e0',
+                            padding: '12px',
+                            marginBottom: '8px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            lineHeight: '1.5',
+                            fontWeight: '300',
+                            fontFamily: "'Atkinson Hyperlegible', serif",
+                            color: '#2d3748',
+                            transition: 'all 0.2s ease',
+                            position: 'relative'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f8f9fa';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#ffffff';
+                          }}
+                        >
+                          <div className="copy-icon" style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            fontSize: '0.7rem',
+                            color: '#6c757d',
+                            opacity: '0',
+                            transition: 'opacity 0.2s ease'
+                          }}>
+                            📋
+                          </div>
+                          {paragraph.trim()}
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="discussion-notes-empty">
+                    No discussion notes for this version
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {/* UPDATED: Enhanced AI Tool */}

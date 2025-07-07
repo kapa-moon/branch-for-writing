@@ -49,6 +49,7 @@ interface AICommentCardProps {
   onContinueChat?: (id: string, threadId: string, message: string) => void;
   onFinishChat?: (id: string, threadId: string) => void;
   onToggleThread?: (id: string, threadId: string) => void;
+  highlightedEvidenceId?: string | null;
 }
 
 const AICommentCard: React.FC<AICommentCardProps> = ({
@@ -70,7 +71,8 @@ const AICommentCard: React.FC<AICommentCardProps> = ({
   onStartChat,
   onContinueChat,
   onFinishChat,
-  onToggleThread
+  onToggleThread,
+  highlightedEvidenceId = null
 }) => {
   const [userInput, setUserInput] = useState('');
   const [hoveredEvidence, setHoveredEvidence] = useState<string | null>(null);
@@ -216,12 +218,16 @@ const AICommentCard: React.FC<AICommentCardProps> = ({
                 width: '16px',
                 height: '16px',
                 borderRadius: '50%',
-                border: '1px solid #6c757d',
+                border: highlightedEvidenceId === item.id 
+                  ? '2px solid #2196f3' 
+                  : '1px solid #6c757d',
                 backgroundColor: clickedEvidence === item.id 
                   ? '#ffeb3b' 
-                  : hoveredEvidence === item.id 
-                    ? '#fff9c4' 
-                    : 'white',
+                  : highlightedEvidenceId === item.id
+                    ? '#e3f2fd'
+                    : hoveredEvidence === item.id 
+                      ? '#fff9c4' 
+                      : 'white',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',

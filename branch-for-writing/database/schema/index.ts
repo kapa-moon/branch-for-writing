@@ -26,6 +26,8 @@ export const documentVersions = pgTable('document_versions', {
   content: jsonb('content').notNull(), // Store TiptapDocument as JSONB
   supporter: text('supporter'), // NEW: Supporter field that can be NULL
   merged: boolean('merged').notNull().default(false), // NEW: Track whether version has been merged
+  discussionNotes: text('discussion_notes'), // NEW: Notes for discussion purposes
+  prepNotes: text('prep_notes'), // NEW: Preparation notes
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
   updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
@@ -48,8 +50,21 @@ export const aiChatRecords = pgTable('ai_chat_records', {
   mainDocId: text('main_doc_id'), // Reference to main document (nullable)
   refDocId: text('ref_doc_id'), // Reference to comparison document (nullable)
   contextContent: text('context_content'), // Selected text context (nullable)
+  aiCommentId: text('ai_comment_id'), // Reference to specific AI comment this chat is about (nullable)
+  threadId: text('thread_id'), // Thread identifier for grouping related messages (nullable)
   userPrompt: text('user_prompt').notNull(), // User's input message
   aiOutput: text('ai_output').notNull(), // AI's response
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+});
+
+// AI discussion insights table for caching AI insights from discussion notes
+export const aiDiscussionInsights = pgTable('ai_discussion_insights', {
+  id: text('id').primaryKey(),
+  mainDocId: text('main_doc_id').notNull(), // Reference to main document
+  refDocId: text('ref_doc_id').notNull(), // Reference to document version with discussion notes
+  insightResults: jsonb('insight_results').notNull(), // Store the complete AI insight analysis
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
   updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),

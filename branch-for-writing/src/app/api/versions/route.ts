@@ -47,7 +47,7 @@ export async function GET() {
         createdAt: doc.createdAt.toISOString(),
         merged: false, // Saved versions don't have merge functionality
       })),
-      // Named versions - include merge status
+      // Named versions - include merge status and notes
       ...namedVersions.map(version => ({
         id: version.id,
         name: version.name,
@@ -56,6 +56,8 @@ export async function GET() {
         type: 'named_version' as const,
         createdAt: version.createdAt.toISOString(),
         merged: version.merged || false, // Include merge status from database
+        discussionNotes: version.discussionNotes || '', // Include discussion notes
+        prepNotes: version.prepNotes || '', // Include prep notes
       }))
     ];
 

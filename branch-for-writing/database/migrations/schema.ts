@@ -89,6 +89,8 @@ export const documentVersions = pgTable("document_versions", {
 	updatedAt: timestamp("updated_at", { mode: 'string' }).notNull(),
 	supporter: text(),
 	merged: boolean().default(false).notNull(),
+	discussionNotes: text("discussion_notes"),
+	prepNotes: text("prep_notes"),
 }, (table) => [
 	foreignKey({
 			columns: [table.userId],
