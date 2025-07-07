@@ -1,5 +1,5 @@
 import { Mark } from '@tiptap/core';
-import { Plugin } from 'prosemirror-state';
+import { Plugin, PluginKey } from 'prosemirror-state';
 
 export interface CommentHighlightOptions {
   HTMLAttributes: Record<string, any>;
@@ -81,7 +81,7 @@ export const CommentHighlight = Mark.create<CommentHighlightOptions>({
   addProseMirrorPlugins() {
     return [
       new Plugin({
-        key: 'commentHighlightClick',
+        key: new PluginKey('commentHighlightClick'),
         props: {
           handleClick: (view, pos, event) => {
             try {

@@ -74,6 +74,9 @@ importers:
       openai:
         specifier: ^5.7.0
         version: 5.7.0(zod@3.25.67)
+      prosemirror-state:
+        specifier: ^1.4.3
+        version: 1.4.3
       react:
         specifier: ^19.0.0
         version: 19.1.0

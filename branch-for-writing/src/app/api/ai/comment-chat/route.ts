@@ -105,7 +105,10 @@ async function generateAIResponse(
   const refText = refDocumentContent ? documentToText(refDocumentContent) : '';
   
   // Build context for the AI
-  const contextMessages = [
+  const contextMessages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }> = [
     {
       role: 'system' as const,
       content: `You're chatting with someone about their writing. Match their tone and style. Use their words, not fancy ones.
