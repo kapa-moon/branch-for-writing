@@ -6,6 +6,8 @@ console.log('Hostname:', window.location.hostname);
 const PLATFORM = {
   GOOGLE_DOCS: 'google_docs',
   CHATGPT: 'chatgpt',
+  CLAUDE: 'claude',
+  GEMINI: 'gemini',
   UNKNOWN: 'unknown'
 };
 
@@ -17,6 +19,10 @@ function detectPlatform() {
     return PLATFORM.GOOGLE_DOCS;
   } else if (hostname.includes('chatgpt.com') || hostname.includes('chat.openai.com')) {
     return PLATFORM.CHATGPT;
+  } else if (hostname.includes('claude.ai')) {
+    return PLATFORM.CLAUDE;
+  } else if (hostname.includes('gemini.google.com')) {
+    return PLATFORM.GEMINI;
   }
   
   return PLATFORM.UNKNOWN;
@@ -63,6 +69,7 @@ if (currentPlatform === PLATFORM.GOOGLE_DOCS) {
 // Configuration
 const CONFIG = {
   API_URL: 'http://localhost:3000/api/keystroke-logs', // ✅ Correct API URL
+  AI_MESSAGES_API_URL: 'http://localhost:3000/api/ai-platform-messages', // ✅ New API URL for AI messages
   BATCH_SIZE: 10,  // Increased from 5 to 10 for better efficiency
   SEND_INTERVAL: 10000, // Reduced from 15000 to 10000 for more frequent sends
   SESSION_ID: 'Drafting_' + Date.now(), // Unique session ID
@@ -681,95 +688,525 @@ function extractChatGPTMessage(article) {
   }
 }
 
-// Monitor for new ChatGPT messages
-function initializeChatGPTMonitoring() {
-  console.log('ChatGPT: Initializing conversation monitoring...');
-  console.log('ChatGPT: DOM readyState:', document.readyState);
-  console.log('ChatGPT: Body element:', !!document.body);
-  
-  // Process existing messages
-  const existingArticles = document.querySelectorAll('article[data-testid*="conversation-turn"]');
-  console.log(`ChatGPT: Found ${existingArticles.length} existing messages`);
-  
-  existingArticles.forEach(article => {
-    const messageData = extractChatGPTMessage(article);
-    if (messageData) {
-      console.log('ChatGPT: Existing message -', messageData);
+// Extract message data from Claude conversation
+function extractClaudeMessage(messageContainer) {
+  try {
+    // Generate a unique message ID based on content and position
+    const content = messageContainer.textContent?.trim() || '';
+    const messageId = 'claude_' + btoa(content.substring(0, 50)).replace(/[^a-zA-Z0-9]/g, '') + '_' + Date.now();
+    
+    if (processedMessages.has(messageId)) {
+      return null;
     }
-  });
-  
-  // Set up MutationObserver to watch for new messages
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          // Check if the added node is an article or contains articles
-          let articles = [];
-          
-          if (node.matches && node.matches('article[data-testid*="conversation-turn"]')) {
-            articles = [node];
-          } else if (node.querySelectorAll) {
-            articles = node.querySelectorAll('article[data-testid*="conversation-turn"]');
-          }
-          
-          articles.forEach(article => {
-            // Add a small delay to ensure the content is fully rendered
-            setTimeout(() => {
-              const messageData = extractChatGPTMessage(article);
-              if (messageData) {
-                console.log('ChatGPT: New message -', messageData);
-              }
-            }, 100);
-          });
-        }
-      });
-    });
-  });
-  
-  // Start observing
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-  
-  console.log('ChatGPT: Monitoring initialized successfully');
+    
+    // Determine sender based on DOM structure
+    let sender = 'unknown';
+    
+    // Check for user message indicators
+    const userMessage = messageContainer.querySelector('[data-testid="user-message"]');
+    const userBubble = messageContainer.querySelector('.user-query-bubble-with-background');
+    
+    if (userMessage || userBubble) {
+      sender = 'user';
+    } else {
+      // Check for AI message indicators
+      const aiMessage = messageContainer.querySelector('.font-claude-message');
+      const modelResponse = messageContainer.querySelector('model-response');
+      
+      if (aiMessage || modelResponse) {
+        sender = 'ai';
+      }
+    }
+    
+    // Extract text content
+    let text = '';
+    
+    // For user messages
+    if (sender === 'user') {
+      const userText = messageContainer.querySelector('.query-text, [data-testid="user-message"] p');
+      if (userText) {
+        text = userText.textContent?.trim() || '';
+      }
+    }
+    
+    // For AI messages
+    if (sender === 'ai') {
+      const aiText = messageContainer.querySelector('.markdown p, .model-response-text p');
+      if (aiText) {
+        text = aiText.textContent?.trim() || '';
+      }
+    }
+    
+    // Fallback: get any text content
+    if (!text) {
+      text = content;
+      // Clean up common UI text
+      text = text.replace(/Edit.*?$/g, '').replace(/Copy.*?$/g, '').replace(/Retry.*?$/g, '').trim();
+    }
+    
+    if (!text) {
+      return null;
+    }
+    
+    const timestamp = new Date().toISOString();
+    
+    processedMessages.add(messageId);
+    
+    return {
+      messageId,
+      sender,
+      timestamp,
+      text
+    };
+  } catch (error) {
+    console.error('Claude: Error extracting message:', error);
+    return null;
+  }
 }
 
-// Manual test function for ChatGPT debugging (accessible from console)
-window.testChatGPTExtraction = function() {
-  console.log('=== TESTING CHATGPT MESSAGE EXTRACTION ===');
+// Extract message data from Gemini conversation
+function extractGeminiMessage(messageContainer) {
+  try {
+    // Generate a unique message ID based on content and position
+    const content = messageContainer.textContent?.trim() || '';
+    const messageId = 'gemini_' + btoa(content.substring(0, 50)).replace(/[^a-zA-Z0-9]/g, '') + '_' + Date.now();
+    
+    if (processedMessages.has(messageId)) {
+      return null;
+    }
+    
+    // Determine sender based on DOM structure
+    let sender = 'unknown';
+    
+    // Check for user message indicators
+    const userQuery = messageContainer.querySelector('user-query');
+    const userQueryContent = messageContainer.querySelector('.user-query-container');
+    
+    if (userQuery || userQueryContent) {
+      sender = 'user';
+    } else {
+      // Check for AI message indicators
+      const modelResponse = messageContainer.querySelector('model-response');
+      const responseContent = messageContainer.querySelector('.response-content');
+      
+      if (modelResponse || responseContent) {
+        sender = 'ai';
+      }
+    }
+    
+    // Extract text content
+    let text = '';
+    
+    // For user messages
+    if (sender === 'user') {
+      const userText = messageContainer.querySelector('.query-text, .user-query-bubble-with-background p');
+      if (userText) {
+        text = userText.textContent?.trim() || '';
+      }
+    }
+    
+    // For AI messages
+    if (sender === 'ai') {
+      const aiText = messageContainer.querySelector('.markdown p, .model-response-text p');
+      if (aiText) {
+        text = aiText.textContent?.trim() || '';
+      }
+    }
+    
+    // Fallback: get any text content
+    if (!text) {
+      text = content;
+      // Clean up common UI text
+      text = text.replace(/Edit.*?$/g, '').replace(/Copy.*?$/g, '').replace(/Share.*?$/g, '').trim();
+    }
+    
+    if (!text) {
+      return null;
+    }
+    
+    const timestamp = new Date().toISOString();
+    
+    processedMessages.add(messageId);
+    
+    return {
+      messageId,
+      sender,
+      timestamp,
+      text
+    };
+  } catch (error) {
+    console.error('Gemini: Error extracting message:', error);
+    return null;
+  }
+}
+
+// Send AI platform message to database
+async function sendAIPlatformMessage(messageData) {
+  if (!CONFIG.USER_ID) {
+    console.error('AI Platform: User ID not initialized, cannot send message');
+    return;
+  }
   
-  const articles = document.querySelectorAll('article[data-testid*="conversation-turn"]');
-  console.log(`Found ${articles.length} conversation articles`);
+  try {
+    // Extract conversation ID from URL or generate one
+    const conversationId = extractConversationId();
+    
+    // Determine platform from current URL
+    const platform = currentPlatform === PLATFORM.CHATGPT ? 'chatgpt' :
+                    currentPlatform === PLATFORM.CLAUDE ? 'claude' :
+                    currentPlatform === PLATFORM.GEMINI ? 'gemini' : 'unknown';
+    
+    const messagePayload = {
+      id: generateId(),
+      platform: platform,
+      conversationId: conversationId,
+      messageId: messageData.messageId,
+      sender: messageData.sender,
+      content: messageData.text,
+      timestamp: messageData.timestamp,
+      metadata: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        platform: platform
+      },
+      userId: CONFIG.USER_ID
+    };
+    
+    console.log(`${platform.toUpperCase()}: Sending message to database:`, messagePayload);
+    
+    const response = await fetch(CONFIG.AI_MESSAGES_API_URL, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Extension-Version': '1.0'
+      },
+      body: JSON.stringify(messagePayload)
+    });
+    
+    if (response.ok) {
+      console.log(`${platform.toUpperCase()}: Message sent successfully`);
+    } else {
+      console.error(`${platform.toUpperCase()}: Failed to send message:`, response.status, response.statusText);
+    }
+  } catch (error) {
+    console.error('AI Platform: Error sending message:', error);
+  }
+}
+
+// Extract conversation ID from AI platform URLs
+function extractConversationId() {
+  const hostname = window.location.hostname;
+  const pathname = window.location.pathname;
   
-  articles.forEach((article, index) => {
-    console.log(`\n--- Article ${index + 1} ---`);
-    const messageData = extractChatGPTMessage(article);
+  // ChatGPT URLs: https://chatgpt.com/c/conversation-id
+  if (hostname.includes('chatgpt.com') || hostname.includes('chat.openai.com')) {
+    const pathMatch = pathname.match(/\/c\/([a-zA-Z0-9-]+)/);
+    if (pathMatch) {
+      return pathMatch[1];
+    }
+  }
+  
+  // Claude URLs: https://claude.ai/chat/conversation-id
+  if (hostname.includes('claude.ai')) {
+    const pathMatch = pathname.match(/\/chat\/([a-zA-Z0-9-]+)/);
+    if (pathMatch) {
+      return pathMatch[1];
+    }
+  }
+  
+  // Gemini URLs: https://gemini.google.com/app/conversation-id
+  if (hostname.includes('gemini.google.com')) {
+    const pathMatch = pathname.match(/\/app\/([a-zA-Z0-9-]+)/);
+    if (pathMatch) {
+      return pathMatch[1];
+    }
+  }
+  
+  // Fallback: use URL hash or generate from current URL
+  if (window.location.hash) {
+    return 'hash_' + window.location.hash.substring(1);
+  }
+  
+  // Final fallback: generate from current URL
+  return 'url_' + btoa(window.location.href).substring(0, 20);
+}
+
+// Monitor for new AI platform messages
+function initializeAIPlatformMonitoring() {
+  const platformName = currentPlatform.toUpperCase();
+  console.log(`${platformName}: Initializing conversation monitoring...`);
+  console.log(`${platformName}: DOM readyState:`, document.readyState);
+  console.log(`${platformName}: Body element:`, !!document.body);
+  
+  // Initialize user ID first
+  initializeUserId().then(() => {
+    console.log(`${platformName}: User ID initialized for monitoring`);
+    
+    // Process existing messages based on platform
+    let existingMessages = [];
+    let messageExtractor = null;
+    
+    switch (currentPlatform) {
+      case PLATFORM.CHATGPT:
+        existingMessages = document.querySelectorAll('article[data-testid*="conversation-turn"]');
+        messageExtractor = extractChatGPTMessage;
+        break;
+      case PLATFORM.CLAUDE:
+        existingMessages = document.querySelectorAll('.conversation-container, [data-test-render-count]');
+        messageExtractor = extractClaudeMessage;
+        break;
+      case PLATFORM.GEMINI:
+        existingMessages = document.querySelectorAll('.conversation-container, user-query, model-response');
+        messageExtractor = extractGeminiMessage;
+        break;
+    }
+    
+    console.log(`${platformName}: Found ${existingMessages.length} existing message containers`);
+    
+    existingMessages.forEach(container => {
+      const messageData = messageExtractor(container);
+      if (messageData) {
+        console.log(`${platformName}: Existing message -`, messageData);
+        // Send existing messages to database
+        sendAIPlatformMessage(messageData);
+      }
+    });
+    
+    // Set up MutationObserver to watch for new messages
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check for new message containers based on platform
+            let newContainers = [];
+            
+            switch (currentPlatform) {
+              case PLATFORM.CHATGPT:
+                if (node.matches && node.matches('article[data-testid*="conversation-turn"]')) {
+                  newContainers = [node];
+                } else if (node.querySelectorAll) {
+                  newContainers = node.querySelectorAll('article[data-testid*="conversation-turn"]');
+                }
+                break;
+              case PLATFORM.CLAUDE:
+                if (node.matches && (node.matches('.conversation-container') || node.matches('[data-test-render-count]'))) {
+                  newContainers = [node];
+                } else if (node.querySelectorAll) {
+                  newContainers = node.querySelectorAll('.conversation-container, [data-test-render-count]');
+                }
+                break;
+              case PLATFORM.GEMINI:
+                if (node.matches && (node.matches('.conversation-container') || node.matches('user-query') || node.matches('model-response'))) {
+                  newContainers = [node];
+                } else if (node.querySelectorAll) {
+                  newContainers = node.querySelectorAll('.conversation-container, user-query, model-response');
+                }
+                break;
+            }
+            
+            newContainers.forEach(container => {
+              // Add a small delay to ensure the content is fully rendered
+              setTimeout(() => {
+                const messageData = messageExtractor(container);
+                if (messageData) {
+                  console.log(`${platformName}: New message -`, messageData);
+                  // Send new messages to database
+                  sendAIPlatformMessage(messageData);
+                }
+              }, 100);
+            });
+          }
+        });
+      });
+    });
+    
+    // Start observing
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    console.log(`${platformName}: Monitoring initialized successfully`);
+  });
+}
+
+// Manual test function for AI platform message extraction (accessible from console)
+window.testAIPlatformExtraction = function() {
+  console.log(`=== TESTING ${currentPlatform.toUpperCase()} MESSAGE EXTRACTION ===`);
+  
+  let containers = [];
+  let extractor = null;
+  
+  switch (currentPlatform) {
+    case PLATFORM.CHATGPT:
+      containers = document.querySelectorAll('article[data-testid*="conversation-turn"]');
+      extractor = extractChatGPTMessage;
+      break;
+    case PLATFORM.CLAUDE:
+      containers = document.querySelectorAll('.conversation-container, [data-test-render-count]');
+      extractor = extractClaudeMessage;
+      break;
+    case PLATFORM.GEMINI:
+      containers = document.querySelectorAll('.conversation-container, user-query, model-response');
+      extractor = extractGeminiMessage;
+      break;
+    default:
+      console.log('❌ Unknown platform for testing');
+      return;
+  }
+  
+  console.log(`Found ${containers.length} message containers`);
+  
+  containers.forEach((container, index) => {
+    console.log(`\n--- Container ${index + 1} ---`);
+    const messageData = extractor(container);
     if (messageData) {
       console.log('✅ Extracted message:', messageData);
     } else {
-      console.log('❌ Failed to extract message from this article');
-      console.log('Article HTML preview:', article.outerHTML.substring(0, 200) + '...');
+      console.log('❌ Failed to extract message from this container');
+      console.log('Container HTML preview:', container.outerHTML.substring(0, 200) + '...');
     }
   });
   
   console.log('\n=== TEST COMPLETE ===');
 };
 
+// Legacy function for backward compatibility
+window.testChatGPTExtraction = function() {
+  if (currentPlatform === PLATFORM.CHATGPT) {
+    window.testAIPlatformExtraction();
+  } else {
+    console.log('❌ This function is only for ChatGPT. Use testAIPlatformExtraction() instead.');
+  }
+};
+
+// Manual test function for AI message sending (accessible from console)
+window.testAIMessageSending = function() {
+  console.log('=== TESTING AI MESSAGE SENDING ===');
+  
+  // Test with a sample message
+  const testMessage = {
+    messageId: 'test_' + Date.now(),
+    sender: 'user',
+    text: 'This is a test message from the console',
+    timestamp: new Date().toISOString()
+  };
+  
+  console.log('Sending test message:', testMessage);
+  
+  sendAIPlatformMessage(testMessage).then(() => {
+    console.log('✅ Test message sent successfully');
+  }).catch((error) => {
+    console.error('❌ Test message failed:', error);
+  });
+};
+
+// User ID management functions (accessible from console)
+window.getUserInfo = function() {
+  console.log('=== USER ID INFORMATION ===');
+  console.log('Current User ID:', CONFIG.USER_ID);
+  console.log('Platform:', currentPlatform);
+  console.log('Current URL:', window.location.href);
+  
+  // Get stored data
+  chrome.storage.local.get(['keystroke_logger_user_id', 'machine_id'], (result) => {
+    console.log('Stored User ID:', result.keystroke_logger_user_id);
+    console.log('Machine ID:', result.machine_id);
+  });
+};
+
+window.resetUserID = function() {
+  console.log('=== RESETTING USER ID ===');
+  chrome.storage.local.remove(['keystroke_logger_user_id', 'machine_id'], () => {
+    console.log('User ID and Machine ID cleared from storage');
+    console.log('Please refresh the page to generate a new User ID');
+  });
+};
+
+window.exportUserData = function() {
+  console.log('=== EXPORTING USER DATA ===');
+  const data = {
+    userId: CONFIG.USER_ID,
+    platform: currentPlatform,
+    url: window.location.href,
+    timestamp: new Date().toISOString(),
+    extensionVersion: '1.1'
+  };
+  
+  // Create download link
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `user-data-${CONFIG.USER_ID}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  console.log('User data exported:', data);
+};
+
 // Initialize user ID from storage or generate new one
 async function initializeUserId() {
   try {
+    // Try to get existing user ID from storage
     const result = await chrome.storage.local.get(['keystroke_logger_user_id']);
+    
     if (result.keystroke_logger_user_id) {
       CONFIG.USER_ID = result.keystroke_logger_user_id;
+      console.log('Extension: Using existing User ID:', CONFIG.USER_ID);
     } else {
-      CONFIG.USER_ID = 'user_' + generateId();
+      // Generate a new persistent user ID
+      // Use a combination of machine-specific info and timestamp for uniqueness
+      const machineId = await generateMachineId();
+      CONFIG.USER_ID = `user_${machineId}_${Date.now()}`;
+      
+      // Store it permanently
       await chrome.storage.local.set({keystroke_logger_user_id: CONFIG.USER_ID});
+      console.log('Extension: Generated new persistent User ID:', CONFIG.USER_ID);
     }
-    console.log('Extension: User ID initialized:', CONFIG.USER_ID);
+    
+    return CONFIG.USER_ID;
   } catch (error) {
     console.error('Error initializing user ID:', error);
-    CONFIG.USER_ID = 'user_' + generateId();
+    // Fallback: generate a temporary ID
+    CONFIG.USER_ID = 'user_temp_' + generateId();
+    return CONFIG.USER_ID;
+  }
+}
+
+// Generate a machine-specific ID that persists across sessions
+async function generateMachineId() {
+  try {
+    // Try to get existing machine ID
+    const result = await chrome.storage.local.get(['machine_id']);
+    
+    if (result.machine_id) {
+      return result.machine_id;
+    }
+    
+    // Generate a new machine ID based on available system info
+    const systemInfo = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      language: navigator.language,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      screenResolution: `${screen.width}x${screen.height}`,
+      colorDepth: screen.colorDepth
+    };
+    
+    // Create a hash-like string from system info
+    const machineString = JSON.stringify(systemInfo);
+    const machineId = btoa(machineString).substring(0, 16).replace(/[^a-zA-Z0-9]/g, '');
+    
+    // Store it permanently
+    await chrome.storage.local.set({machine_id: machineId});
+    
+    console.log('Extension: Generated new machine ID:', machineId);
+    return machineId;
+  } catch (error) {
+    console.error('Error generating machine ID:', error);
+    // Fallback: use timestamp-based ID
+    return 'machine_' + Date.now().toString(36);
   }
 }
 
@@ -1174,11 +1611,13 @@ function initializePlatform() {
       break;
       
     case PLATFORM.CHATGPT:
-      console.log('Initializing ChatGPT conversation monitoring...');
+    case PLATFORM.CLAUDE:
+    case PLATFORM.GEMINI:
+      console.log(`Initializing ${currentPlatform} conversation monitoring...`);
       try {
-        initializeChatGPTMonitoring();
+        initializeAIPlatformMonitoring();
       } catch (error) {
-        console.error('Error initializing ChatGPT monitoring:', error);
+        console.error(`Error initializing ${currentPlatform} monitoring:`, error);
       }
       break;
       

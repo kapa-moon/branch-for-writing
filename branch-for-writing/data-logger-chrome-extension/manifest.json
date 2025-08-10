@@ -5,7 +5,9 @@
     "description": "Logs granular edits in Google Docs and ChatGPT conversations for research",
     "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
   ],
     "background": {
       "service_worker": "background.js"
@@ -15,7 +17,9 @@
         "matches": [
           "https://docs.google.com/document/*",
           "https://chatgpt.com/*",
-          "https://chat.openai.com/*"
+          "https://chat.openai.com/*",
+          "https://claude.ai/*",
+          "https://gemini.google.com/*"
         ],
         "js": [
           "lib/diff_match_patch.js",

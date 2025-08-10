@@ -87,4 +87,19 @@ export const keystrokeLogs = pgTable('keystroke_logs', {
   keystrokeCount: integer('keystroke_count').default(1), // Number of keystrokes in this event
   createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
   updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+});
+
+// AI platform messages table for logging conversations from various AI platforms
+export const aiPlatformMessages = pgTable('ai_platform_messages', {
+  id: text('id').primaryKey(),
+  platform: text('platform').notNull(), // 'chatgpt', 'claude', 'gemini', etc.
+  conversationId: text('conversation_id').notNull(), // Unique identifier for the conversation/thread
+  messageId: text('message_id').notNull(), // Platform-specific message ID to avoid duplicates
+  sender: text('sender').notNull(), // 'user' or 'ai'
+  content: text('content').notNull(), // The message content
+  timestamp: timestamp('timestamp').notNull(), // When the message was sent/received
+  metadata: jsonb('metadata'), // Additional platform-specific data (optional)
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
 }); 
