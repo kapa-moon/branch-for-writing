@@ -6,7 +6,7 @@ export * from './auth'; // better-auth will generate this file
 import { user } from './auth'; // Import user table for foreign key reference
 
 // You can also define your own application-specific tables here
-import { pgTable, text, timestamp, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, boolean, integer } from 'drizzle-orm/pg-core';
 
 // Main document table for tracking the current working document in the editor
 export const mainDocuments = pgTable('main_documents', {
@@ -66,6 +66,25 @@ export const aiDiscussionInsights = pgTable('ai_discussion_insights', {
   refDocId: text('ref_doc_id').notNull(), // Reference to document version with discussion notes
   insightResults: jsonb('insight_results').notNull(), // Store the complete AI insight analysis
   userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
+  updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
+});
+
+// Keystroke logs table for real-time keystroke tracking in Google Docs
+export const keystrokeLogs = pgTable('keystroke_logs', {
+  id: text('id').primaryKey(),
+  docId: text('doc_id').notNull(), // Google Doc ID from URL
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id').notNull(), // Session identifier (e.g., 'Drafting', 'Editing')
+  timestamp: timestamp('timestamp').notNull(), // When the keystroke occurred
+  beforeText: text('before_text').notNull(), // Text before the change
+  afterText: text('after_text').notNull(), // Text after the change
+  diffData: jsonb('diff_data').notNull(), // diff-match-patch results as JSON
+  actionType: text('action_type').notNull(), // 'insert', 'delete', 'replace', 'paste', 'undo', etc.
+  cursorPosition: integer('cursor_position'), // Cursor position when change occurred
+  textLengthBefore: integer('text_length_before').notNull(), // Character count before change
+  textLengthAfter: integer('text_length_after').notNull(), // Character count after change
+  keystrokeCount: integer('keystroke_count').default(1), // Number of keystrokes in this event
   createdAt: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
   updatedAt: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
 }); 

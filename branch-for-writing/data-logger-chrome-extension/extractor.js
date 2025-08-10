@@ -10,9 +10,11 @@
     window.docsTextExtractorInstalled = true;
   } catch (_) {}
   
-  // Store extraction function globally
-  window.extractGoogleDocsText = function() {
+  // Store tab-aware extraction function globally
+  window.extractGoogleDocsText = function(tabId = 'main') {
     try {
+      console.log(`Extractor: Starting text extraction for tab: ${tabId}`);
+      
       // Method 1: Advanced iframe closure extraction (WORKING METHOD!)
       const iframe = document.querySelector('.docs-texteventtarget-iframe');
       if (iframe && iframe.contentDocument) {
@@ -22,7 +24,7 @@
         if (closureKey) {
           const result = dig(doc[closureKey], new Set()) || '';
           if (result.length > 0) {
-            console.log(`Text extraction successful via iframe closure: ${result.length} chars`);
+            console.log(`Extractor: Text extraction successful via iframe closure for tab ${tabId}: ${result.length} chars`);
             return result;
           }
         }
@@ -42,15 +44,15 @@
           .trim();
         
         if (cleanText.length > 0) {
-          console.log(`Text extraction (DOM fallback): ${cleanText.length} chars`);
+          console.log(`Extractor: Text extraction (DOM fallback) for tab ${tabId}: ${cleanText.length} chars`);
           return cleanText;
         }
       }
       
-      console.log('No document text found');
+      console.log(`Extractor: No document text found for tab ${tabId}`);
       return '';
     } catch (error) {
-      console.log('Text extraction error:', error);
+      console.log(`Extractor: Text extraction error for tab ${tabId}:`, error);
       return '';
     }
   };
@@ -80,11 +82,13 @@
   // Listen for extraction requests from content script
   window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'EXTRACT_DOCS_TEXT') {
-      const text = window.extractGoogleDocsText();
+      const tabId = event.data.tabId || 'main';
+      const text = window.extractGoogleDocsText(tabId);
       window.postMessage({
         type: 'DOCS_TEXT_RESULT',
         requestId: event.data.requestId,
-        text: text
+        text: text,
+        tabId: tabId
       }, '*');
     }
   });
