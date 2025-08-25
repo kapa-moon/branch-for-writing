@@ -23,7 +23,12 @@
         ],
         "js": [
           "lib/diff_match_patch.js",
-          "content.js"
+          "modules/platform-detector.js",
+          "modules/user-management.js",
+          "modules/ai-platform-logger.js",
+          "modules/google-docs-logger.js",
+          "modules/permission-popup.js",
+          "content-new.js"
         ],
         "run_at": "document_end"
       }

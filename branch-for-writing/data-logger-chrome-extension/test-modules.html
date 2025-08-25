@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extension Module Test</title>
+</head>
+<body>
+    <h1>Extension Module Test</h1>
+    <p>This page tests the modular structure of the extension.</p>
+    <p>Open the browser console to see test results.</p>
+    
+    <script type="module">
+        // Test imports
+        try {
+            import('./modules/platform-detector.js').then(module => {
+                console.log('✅ Platform detector module loaded');
+                console.log('PLATFORM enum:', module.PLATFORM);
+                console.log('detectPlatform function:', typeof module.detectPlatform);
+            }).catch(error => {
+                console.error('❌ Platform detector module failed:', error);
+            });
+
+            import('./modules/user-management.js').then(module => {
+                console.log('✅ User management module loaded');
+                console.log('generateId function:', typeof module.generateId);
+                console.log('initializeUserId function:', typeof module.initializeUserId);
+            }).catch(error => {
+                console.error('❌ User management module failed:', error);
+            });
+
+            import('./modules/ai-platform-logger.js').then(module => {
+                console.log('✅ AI platform logger module loaded');
+                console.log('initializeAIPlatformMonitoring function:', typeof module.initializeAIPlatformMonitoring);
+            }).catch(error => {
+                console.error('❌ AI platform logger module failed:', error);
+            });
+
+            import('./modules/google-docs-logger.js').then(module => {
+                console.log('✅ Google Docs logger module loaded');
+                console.log('initializeTab function:', typeof module.initializeTab);
+            }).catch(error => {
+                console.error('❌ Google Docs logger module failed:', error);
+            });
+
+            import('./modules/permission-popup.js').then(module => {
+                console.log('✅ Permission popup module loaded');
+                console.log('createPermissionPopup function:', typeof module.createPermissionPopup);
+            }).catch(error => {
+                console.error('❌ Permission popup module failed:', error);
+            });
+
+        } catch (error) {
+            console.error('❌ Module import test failed:', error);
+        }
+    </script>
+</body>
+</html>
+
