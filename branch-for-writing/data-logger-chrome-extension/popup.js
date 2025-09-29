@@ -62,7 +62,8 @@ async function loadTrackedDocuments() {
     }
     
     // Query the API for tracked documents
-    const response = await fetch(`http://localhost:3000/api/keystroke-logs?user_id=${userId}&limit=1000`);
+    // const response = await fetch(`http://localhost:3000/api/keystroke-logs?user_id=${userId}&limit=1000`); // Local development
+    const response = await fetch(`https://branch-for-writing-376h.vercel.app/api/keystroke-logs?user_id=${userId}&limit=1000`);
     
     if (!response.ok) {
       throw new Error('Failed to fetch documents');
@@ -108,13 +109,19 @@ async function loadAIConversations() {
     }
     
     // Fetch AI conversations from the API
-    const response = await fetch(`http://localhost:3000/api/ai-platform-messages?user_id=${userId}&limit=1000`);
+    console.log('Fetching AI conversations for user:', userId);
+    // const response = await fetch(`http://localhost:3000/api/ai-platform-messages?user_id=${userId}&limit=1000`); // Local development
+    const response = await fetch(`https://branch-for-writing-376h.vercel.app/api/ai-platform-messages?user_id=${userId}&limit=1000`);
+    console.log('Response status:', response.status, response.statusText);
     
     if (!response.ok) {
-      throw new Error('Failed to fetch AI conversations');
+      const errorText = await response.text();
+      console.error('API Error Response:', errorText);
+      throw new Error(`Failed to fetch AI conversations: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
+    console.log('Received AI conversations data:', data);
     
     if (!data.conversations || data.conversations.length === 0) {
       chatList.innerHTML = '<p class="no-data">No AI conversations tracked yet. Visit ChatGPT, Claude, or Gemini to start tracking.</p>';
@@ -151,7 +158,7 @@ async function loadAIConversations() {
     
   } catch (error) {
     console.error('Error loading AI conversations:', error);
-    chatList.innerHTML = '<p class="no-data">Error loading conversations. Please ensure the server is running.</p>';
+    chatList.innerHTML = `<p class="no-data">Error loading conversations: ${error.message}</p>`;
   }
 }
 
@@ -330,7 +337,9 @@ function setupFeedbackInput() {
       }
       
       // Send feedback to API
-      const response = await fetch('http://localhost:3000/api/user-feedback', {
+      console.log('Sending feedback for user:', userId);
+      // const response = await fetch('http://localhost:3000/api/user-feedback', { // Local development
+      const response = await fetch('https://branch-for-writing-376h.vercel.app/api/user-feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -340,9 +349,12 @@ function setupFeedbackInput() {
           content: content
         })
       });
+      console.log('Response status:', response.status, response.statusText);
       
       if (!response.ok) {
-        throw new Error('Failed to submit feedback');
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`Failed to submit feedback: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
@@ -361,7 +373,7 @@ function setupFeedbackInput() {
       
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      showFeedbackStatus('Error submitting feedback. Please ensure the server is running.', 'error');
+      showFeedbackStatus(`Error submitting feedback: ${error.message}`, 'error');
     }
   }
   

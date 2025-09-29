@@ -68,8 +68,10 @@ if (currentPlatform === PLATFORM.GOOGLE_DOCS) {
 
 // Configuration
 const CONFIG = {
-  API_URL: 'http://localhost:3000/api/keystroke-logs', // ✅ Correct API URL
-  AI_MESSAGES_API_URL: 'http://localhost:3000/api/ai-platform-messages', // ✅ New API URL for AI messages
+  // API_URL: 'http://localhost:3000/api/keystroke-logs', // Local development
+  // AI_MESSAGES_API_URL: 'http://localhost:3000/api/ai-platform-messages', // Local development
+  API_URL: 'https://branch-for-writing-376h.vercel.app/api/keystroke-logs', // ✅ Production API URL
+  AI_MESSAGES_API_URL: 'https://branch-for-writing-376h.vercel.app/api/ai-platform-messages', // ✅ Production AI messages API
   BATCH_SIZE: 10,  // Increased from 5 to 10 for better efficiency
   SEND_INTERVAL: 10000, // Reduced from 15000 to 10000 for more frequent sends
   SESSION_ID: 'Drafting_' + Date.now(), // Unique session ID
