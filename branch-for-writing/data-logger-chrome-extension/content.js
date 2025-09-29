@@ -619,8 +619,48 @@ function determineActionType(diffs, beforeLength, afterLength) {
 
 // ======== CHATGPT CONVERSATION MONITORING ========
 
-// Track processed messages to avoid duplicates
+// Track processed messages to avoid duplicates (persists across page loads)
 const processedMessages = new Set();
+
+// Load previously processed messages from storage
+async function loadProcessedMessages() {
+  try {
+    const conversationId = extractConversationId();
+    const storageKey = `processed_messages_${conversationId}`;
+    const result = await chrome.storage.local.get([storageKey]);
+    const storedMessages = result[storageKey] || [];
+    
+    // Add all stored message IDs to the Set
+    storedMessages.forEach(msgId => processedMessages.add(msgId));
+    console.log(`${currentPlatform.toUpperCase()}: Loaded ${storedMessages.length} previously processed messages`);
+  } catch (error) {
+    console.error('Error loading processed messages:', error);
+  }
+}
+
+// Save a processed message ID to storage
+async function saveProcessedMessage(messageId) {
+  try {
+    const conversationId = extractConversationId();
+    const storageKey = `processed_messages_${conversationId}`;
+    const result = await chrome.storage.local.get([storageKey]);
+    let storedMessages = result[storageKey] || [];
+    
+    // Add new message ID if not already stored
+    if (!storedMessages.includes(messageId)) {
+      storedMessages.push(messageId);
+      
+      // Keep only the last 1000 messages to avoid storage bloat
+      if (storedMessages.length > 1000) {
+        storedMessages = storedMessages.slice(-1000);
+      }
+      
+      await chrome.storage.local.set({ [storageKey]: storedMessages });
+    }
+  } catch (error) {
+    console.error('Error saving processed message:', error);
+  }
+}
 
 // Extract message data from ChatGPT article
 function extractChatGPTMessage(article) {
@@ -675,6 +715,8 @@ function extractChatGPTMessage(article) {
     const timestamp = new Date().toISOString();
     
     processedMessages.add(messageId);
+    // Save to persistent storage
+    saveProcessedMessage(messageId);
     
     return {
       messageId,
@@ -751,6 +793,8 @@ function extractClaudeMessage(messageContainer) {
     const timestamp = new Date().toISOString();
     
     processedMessages.add(messageId);
+    // Save to persistent storage
+    saveProcessedMessage(messageId);
     
     return {
       messageId,
@@ -827,6 +871,8 @@ function extractGeminiMessage(messageContainer) {
     const timestamp = new Date().toISOString();
     
     processedMessages.add(messageId);
+    // Save to persistent storage
+    saveProcessedMessage(messageId);
     
     return {
       messageId,
@@ -931,103 +977,251 @@ function extractConversationId() {
   return 'url_' + btoa(window.location.href).substring(0, 20);
 }
 
+// Check if the current conversation is already tracked
+async function isConversationTracked() {
+  try {
+    const conversationId = extractConversationId();
+    const result = await chrome.storage.local.get(['tracked_ai_conversations']);
+    const trackedConversations = result.tracked_ai_conversations || [];
+    
+    return trackedConversations.includes(conversationId);
+  } catch (error) {
+    console.error('Error checking conversation tracking status:', error);
+    return false;
+  }
+}
+
+// Add conversation to tracked list
+async function addTrackedConversation(conversationId) {
+  try {
+    const result = await chrome.storage.local.get(['tracked_ai_conversations']);
+    let trackedConversations = result.tracked_ai_conversations || [];
+    
+    if (!trackedConversations.includes(conversationId)) {
+      trackedConversations.push(conversationId);
+      await chrome.storage.local.set({ 'tracked_ai_conversations': trackedConversations });
+      console.log(`${currentPlatform.toUpperCase()}: Conversation ${conversationId} added to tracking list`);
+    }
+  } catch (error) {
+    console.error('Error adding conversation to tracking list:', error);
+  }
+}
+
+// Show permission request popup for tracking
+function showTrackingPermissionPopup() {
+  const platformName = currentPlatform === PLATFORM.CHATGPT ? 'ChatGPT' :
+                      currentPlatform === PLATFORM.CLAUDE ? 'Claude' :
+                      currentPlatform === PLATFORM.GEMINI ? 'Gemini' : 'AI';
+  
+  const conversationId = extractConversationId();
+  
+  // Create popup overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'tracking-permission-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+    font-family: 'Atkinson Hyperlegible', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  `;
+  
+  // Create popup content
+  const popup = document.createElement('div');
+  popup.style.cssText = `
+    background-color: white;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  `;
+  
+  popup.innerHTML = `
+    <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #000;">
+      Track this ${platformName} conversation?
+    </h2>
+    <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #333;">
+      Would you like to log this conversation for research purposes? Your messages will be stored securely for analysis.
+    </p>
+    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+      <button id="tracking-deny" style="
+        padding: 10px 20px;
+        border: 2px solid #ccc;
+        background-color: white;
+        color: #666;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+      ">
+        No, thanks
+      </button>
+      <button id="tracking-allow" style="
+        padding: 10px 20px;
+        border: 2px solid #000;
+        background-color: #000;
+        color: white;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+      ">
+        Yes, track this conversation
+      </button>
+    </div>
+  `;
+  
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+  
+  // Add event listeners
+  document.getElementById('tracking-allow').addEventListener('click', async () => {
+    await addTrackedConversation(conversationId);
+    overlay.remove();
+    // Start monitoring after permission granted
+    startAIPlatformMonitoring();
+  });
+  
+  document.getElementById('tracking-deny').addEventListener('click', () => {
+    overlay.remove();
+    console.log(`${currentPlatform.toUpperCase()}: User declined tracking for conversation ${conversationId}`);
+  });
+  
+  // Close on overlay click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
+  });
+}
+
+// Start monitoring AI platform messages
+function startAIPlatformMonitoring() {
+  const platformName = currentPlatform.toUpperCase();
+  console.log(`${platformName}: Starting conversation monitoring...`);
+  
+  // Process existing messages based on platform
+  let existingMessages = [];
+  let messageExtractor = null;
+  
+  switch (currentPlatform) {
+    case PLATFORM.CHATGPT:
+      existingMessages = document.querySelectorAll('article[data-testid*="conversation-turn"]');
+      messageExtractor = extractChatGPTMessage;
+      break;
+    case PLATFORM.CLAUDE:
+      existingMessages = document.querySelectorAll('.conversation-container, [data-test-render-count]');
+      messageExtractor = extractClaudeMessage;
+      break;
+    case PLATFORM.GEMINI:
+      existingMessages = document.querySelectorAll('.conversation-container, user-query, model-response');
+      messageExtractor = extractGeminiMessage;
+      break;
+  }
+  
+  console.log(`${platformName}: Found ${existingMessages.length} existing message containers`);
+  
+  existingMessages.forEach(container => {
+    const messageData = messageExtractor(container);
+    if (messageData) {
+      console.log(`${platformName}: Existing message -`, messageData);
+      // Send existing messages to database
+      sendAIPlatformMessage(messageData);
+    }
+  });
+  
+  // Set up MutationObserver to watch for new messages
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          // Check for new message containers based on platform
+          let newContainers = [];
+          
+          switch (currentPlatform) {
+            case PLATFORM.CHATGPT:
+              if (node.matches && node.matches('article[data-testid*="conversation-turn"]')) {
+                newContainers = [node];
+              } else if (node.querySelectorAll) {
+                newContainers = node.querySelectorAll('article[data-testid*="conversation-turn"]');
+              }
+              break;
+            case PLATFORM.CLAUDE:
+              if (node.matches && (node.matches('.conversation-container') || node.matches('[data-test-render-count]'))) {
+                newContainers = [node];
+              } else if (node.querySelectorAll) {
+                newContainers = node.querySelectorAll('.conversation-container, [data-test-render-count]');
+              }
+              break;
+            case PLATFORM.GEMINI:
+              if (node.matches && (node.matches('.conversation-container') || node.matches('user-query') || node.matches('model-response'))) {
+                newContainers = [node];
+              } else if (node.querySelectorAll) {
+                newContainers = node.querySelectorAll('.conversation-container, user-query, model-response');
+              }
+              break;
+          }
+          
+          newContainers.forEach(container => {
+            // Add a small delay to ensure the content is fully rendered
+            setTimeout(() => {
+              const messageData = messageExtractor(container);
+              if (messageData) {
+                console.log(`${platformName}: New message -`, messageData);
+                // Send new messages to database
+                sendAIPlatformMessage(messageData);
+              }
+            }, 100);
+          });
+        }
+      });
+    });
+  });
+  
+  // Start observing
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+  
+  console.log(`${platformName}: Monitoring initialized successfully`);
+}
+
 // Monitor for new AI platform messages
-function initializeAIPlatformMonitoring() {
+async function initializeAIPlatformMonitoring() {
   const platformName = currentPlatform.toUpperCase();
   console.log(`${platformName}: Initializing conversation monitoring...`);
   console.log(`${platformName}: DOM readyState:`, document.readyState);
   console.log(`${platformName}: Body element:`, !!document.body);
   
   // Initialize user ID first
-  initializeUserId().then(() => {
-    console.log(`${platformName}: User ID initialized for monitoring`);
-    
-    // Process existing messages based on platform
-    let existingMessages = [];
-    let messageExtractor = null;
-    
-    switch (currentPlatform) {
-      case PLATFORM.CHATGPT:
-        existingMessages = document.querySelectorAll('article[data-testid*="conversation-turn"]');
-        messageExtractor = extractChatGPTMessage;
-        break;
-      case PLATFORM.CLAUDE:
-        existingMessages = document.querySelectorAll('.conversation-container, [data-test-render-count]');
-        messageExtractor = extractClaudeMessage;
-        break;
-      case PLATFORM.GEMINI:
-        existingMessages = document.querySelectorAll('.conversation-container, user-query, model-response');
-        messageExtractor = extractGeminiMessage;
-        break;
-    }
-    
-    console.log(`${platformName}: Found ${existingMessages.length} existing message containers`);
-    
-    existingMessages.forEach(container => {
-      const messageData = messageExtractor(container);
-      if (messageData) {
-        console.log(`${platformName}: Existing message -`, messageData);
-        // Send existing messages to database
-        sendAIPlatformMessage(messageData);
-      }
-    });
-    
-    // Set up MutationObserver to watch for new messages
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            // Check for new message containers based on platform
-            let newContainers = [];
-            
-            switch (currentPlatform) {
-              case PLATFORM.CHATGPT:
-                if (node.matches && node.matches('article[data-testid*="conversation-turn"]')) {
-                  newContainers = [node];
-                } else if (node.querySelectorAll) {
-                  newContainers = node.querySelectorAll('article[data-testid*="conversation-turn"]');
-                }
-                break;
-              case PLATFORM.CLAUDE:
-                if (node.matches && (node.matches('.conversation-container') || node.matches('[data-test-render-count]'))) {
-                  newContainers = [node];
-                } else if (node.querySelectorAll) {
-                  newContainers = node.querySelectorAll('.conversation-container, [data-test-render-count]');
-                }
-                break;
-              case PLATFORM.GEMINI:
-                if (node.matches && (node.matches('.conversation-container') || node.matches('user-query') || node.matches('model-response'))) {
-                  newContainers = [node];
-                } else if (node.querySelectorAll) {
-                  newContainers = node.querySelectorAll('.conversation-container, user-query, model-response');
-                }
-                break;
-            }
-            
-            newContainers.forEach(container => {
-              // Add a small delay to ensure the content is fully rendered
-              setTimeout(() => {
-                const messageData = messageExtractor(container);
-                if (messageData) {
-                  console.log(`${platformName}: New message -`, messageData);
-                  // Send new messages to database
-                  sendAIPlatformMessage(messageData);
-                }
-              }, 100);
-            });
-          }
-        });
-      });
-    });
-    
-    // Start observing
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    
-    console.log(`${platformName}: Monitoring initialized successfully`);
-  });
+  await initializeUserId();
+  console.log(`${platformName}: User ID initialized for monitoring`);
+  
+  // Load previously processed messages to avoid duplicates when revisiting conversations
+  await loadProcessedMessages();
+  
+  // Check if conversation is already tracked
+  const isTracked = await isConversationTracked();
+  
+  if (isTracked) {
+    console.log(`${platformName}: Conversation is already tracked, starting monitoring`);
+    startAIPlatformMonitoring();
+  } else {
+    console.log(`${platformName}: Conversation not tracked, showing permission popup`);
+    // Wait a bit for the page to fully load before showing popup
+    setTimeout(() => {
+      showTrackingPermissionPopup();
+    }, 2000);
+  }
 }
 
 // Manual test function for AI platform message extraction (accessible from console)
@@ -1130,7 +1324,7 @@ window.exportUserData = function() {
     platform: currentPlatform,
     url: window.location.href,
     timestamp: new Date().toISOString(),
-    extensionVersion: '1.1'
+    extensionVersion: '0.1'
   };
   
   // Create download link
@@ -1598,11 +1792,58 @@ function installExtractor() {
   (document.head || document.documentElement).appendChild(script);
 }
 
+// Check if the current document should be tracked
+async function shouldTrackCurrentDocument() {
+  if (currentPlatform !== PLATFORM.GOOGLE_DOCS) {
+    // For non-Google Docs platforms, always track
+    return true;
+  }
+  
+  try {
+    // Get the tracked document IDs from storage
+    const result = await chrome.storage.local.get(['tracked_doc_ids']);
+    const trackedDocIds = result.tracked_doc_ids || [];
+    
+    // If no documents are in the tracking list, don't track anything
+    if (trackedDocIds.length === 0) {
+      console.log('Extension: No documents in tracking list, skipping tracking');
+      return false;
+    }
+    
+    // Extract current document ID
+    const { docId } = extractDocInfo();
+    
+    // Check if current document is in the tracked documents list
+    if (trackedDocIds.includes(docId)) {
+      console.log('Extension: Current document is in tracking list:', docId);
+      return true;
+    } else {
+      console.log('Extension: Current document is not in tracking list');
+      console.log('Extension: Current doc:', docId);
+      console.log('Extension: Tracked docs:', trackedDocIds);
+      console.log('Extension: Skipping tracking for this document');
+      return false;
+    }
+  } catch (error) {
+    console.error('Extension: Error checking tracked documents:', error);
+    // On error, default to not tracking
+    return false;
+  }
+}
+
 // Platform-specific initialization
-function initializePlatform() {
+async function initializePlatform() {
   console.log('Initializing for platform:', currentPlatform);
   console.log('Current hostname:', window.location.hostname);
   console.log('Platform constants:', PLATFORM);
+  
+  // Check if we should track this document
+  const shouldTrack = await shouldTrackCurrentDocument();
+  
+  if (!shouldTrack) {
+    console.log('Extension: Tracking disabled for this document');
+    return;
+  }
   
   switch (currentPlatform) {
     case PLATFORM.GOOGLE_DOCS:
@@ -1627,6 +1868,15 @@ function initializePlatform() {
       break;
   }
 }
+
+// Listen for storage changes (when user updates tracked documents list)
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && changes.tracked_doc_ids) {
+    console.log('Extension: Tracked documents list changed, reloading page to apply changes');
+    // Reload the page to reinitialize with new settings
+    window.location.reload();
+  }
+});
 
 // Start when DOM is ready
 if (document.readyState === 'loading') {
