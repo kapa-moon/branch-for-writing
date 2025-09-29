@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Writing Research Data Logger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Writing Research Data Logger</h1>
+      <p class="subtitle">Thank you for participating!</p>
+    </header>
+    
+    <main>
+      <!-- Row 1: Google Docs Tracking -->
+      <div class="tracking-row" id="google-docs-row">
+        <button class="row-button" id="google-docs-button">
+          <span class="row-title">Google Docs Tracking</span>
+          <span class="arrow">▶</span>
+        </button>
+        <div class="row-content hidden" id="google-docs-content">
+          <!-- Document URL Input Section -->
+          <div class="doc-input-section">
+            <label for="doc-url-input" class="input-label">Add Google Doc link to track:</label>
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                id="doc-url-input" 
+                class="doc-url-input" 
+                placeholder="https://docs.google.com/document/d/..."
+              />
+              <button id="save-doc-url" class="save-button">Add</button>
+            </div>
+            <div id="doc-url-status" class="status-message"></div>
+            <div id="tracked-doc-display" class="tracked-doc-info"></div>
+          </div>
+          
+          <div class="divider-small"></div>
+          
+          <!-- Document List Section -->
+          <div class="doc-list" id="doc-list">
+            <p class="loading-text">Loading tracked documents...</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <!-- Row 2: AI Chat Tracking -->
+      <div class="tracking-row" id="ai-chat-row">
+        <button class="row-button" id="ai-chat-button">
+          <span class="row-title">AI Chat Tracking</span>
+          <span class="arrow">▶</span>
+        </button>
+        <div class="row-content hidden" id="ai-chat-content">
+          <div class="chat-list" id="chat-list">
+            <p class="loading-text">Loading AI conversations...</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <!-- Row 3: Report Issues -->
+      <div class="tracking-row" id="report-issues-row">
+        <button class="row-button" id="report-issues-button">
+          <span class="row-title">Give Feedback or Report Issues</span>
+          <span class="arrow">▶</span>
+        </button>
+        <div class="row-content hidden" id="report-issues-content">
+          <div class="feedback-section">
+            <!-- <label for="feedback-textarea" class="input-label">Send your feedback:</label> -->
+            <div class="feedback-input-wrapper">
+              <textarea 
+                id="feedback-textarea" 
+                class="feedback-textarea" 
+                placeholder="Share your thoughts, report issues, or provide suggestions..."
+                rows="3"
+              ></textarea>
+              <button id="send-feedback-button" class="send-button">Send</button>
+            </div>
+            <div id="feedback-status" class="status-message"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+    
+    <footer>
+      <p class="footer-text">Contact research team to delete records if needed</p>
+      <a href="mailto:yy2228@cornell.edu" class="footer-email">yy2228@cornell.edu</a>
+    </footer>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

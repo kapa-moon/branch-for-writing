@@ -1,0 +1,49 @@
+{
+    "manifest_version": 3,
+    "name": "Writing Data Logger",
+    "version": "0.1",
+    "description": "Logs granular edits in Google Docs and ChatGPT conversations for research",
+    "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://branch-for-writing-376h.vercel.app/*",
+    "https://chatgpt.com/c/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/chat/*",
+    "https://gemini.google.com/app/*"
+  ],
+    "action": {
+      "default_popup": "popup.html",
+      "default_title": "Data Logger",
+      "default_icon": {
+        "16": "icon.png",
+        "48": "icon.png",
+        "128": "icon.png"
+      }
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "content_scripts": [
+      {
+        "matches": [
+          "https://docs.google.com/document/*",
+          "https://chatgpt.com/*",
+          "https://chat.openai.com/*",
+          "https://claude.ai/*",
+          "https://gemini.google.com/*"
+        ],
+        "js": [
+          "lib/diff_match_patch.js",
+          "content.js"
+        ],
+        "run_at": "document_end"
+      }
+    ],
+    "web_accessible_resources": [
+      {
+        "resources": ["extractor.js"],
+        "matches": ["https://docs.google.com/*"]
+      }
+    ]
+  }
